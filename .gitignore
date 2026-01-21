@@ -1,0 +1,36 @@
+# ========================
+# 🔐 SECRETS & CREDENTIALS
+# ========================
+.env
+.env.*
+*.env
+
+# Google credentials
+*.json
+credentials/
+service_account.json
+
+# ========================
+# 🐍 PYTHON
+# ========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# ========================
+# 🖥️ OS / EDITORS
+# ========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ========================
+# 🧾 LOGS & TEMP
+# ========================
+*.log
+tmp/
+.cache/

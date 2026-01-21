@@ -1,0 +1,151 @@
+student_id,grade,subject,primary_issue,secondary_issue,root_cause_category,academic_risk_level,urgency_level,recommended_focus_area,teacher_intervention_needed,confidence_in_insight,summary_signal
+S001,11,English,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,medium,high performer with medium risk
+S001,11,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S001,11,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S002,1,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,high performer with low risk
+S002,1,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,high performer with low risk
+S002,1,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S003,5,English,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S003,5,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S003,5,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S004,7,English,Consistently low and declining performance,None observed,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,high,low performer with high risk
+S004,7,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S004,7,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S005,9,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S005,9,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S005,9,Science,Consistently low and declining performance,None observed,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,medium,low performer with high risk
+S006,8,English,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,medium,medium performer with medium risk
+S006,8,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S006,8,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S007,4,English,Low overall performance,Exam pressure affecting real exam performance,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S007,4,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S007,4,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S008,4,English,Consistently low and declining performance,Exam pressure affecting real exam performance,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,medium,low performer with high risk
+S008,4,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S008,4,Science,No major academic concern,Exam pressure affecting real exam performance,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S009,2,English,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S009,2,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S009,2,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S010,5,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S010,5,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S010,5,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,high performer with low risk
+S011,1,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S011,1,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,high performer with low risk
+S011,1,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S012,11,English,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S012,11,Math,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,medium,medium performer with medium risk
+S012,11,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S013,5,English,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S013,5,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S013,5,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S014,9,English,Consistently low and declining performance,None observed,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,high,low performer with high risk
+S014,9,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S014,9,Science,No major academic concern,Exam pressure affecting real exam performance,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S015,11,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,high performer with low risk
+S015,11,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S015,11,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S016,4,English,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,high,medium performer with medium risk
+S016,4,Math,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,medium,high performer with medium risk
+S016,4,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S017,9,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S017,9,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S017,9,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S018,4,English,Performance regression,Exam pressure affecting real exam performance,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,high,medium performer with medium risk
+S018,4,Math,Performance regression,Exam pressure affecting real exam performance,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,high,medium performer with medium risk
+S018,4,Science,Consistently low and declining performance,Exam pressure affecting real exam performance,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,medium,low performer with high risk
+S019,1,English,Consistently low and declining performance,None observed,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,medium,low performer with high risk
+S019,1,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S019,1,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S020,10,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S020,10,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S020,10,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S021,8,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,high performer with low risk
+S021,8,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S021,8,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S022,12,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S022,12,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S022,12,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S023,12,English,Consistently low and declining performance,None observed,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,high,low performer with high risk
+S023,12,Math,Low overall performance,Exam pressure affecting real exam performance,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S023,12,Science,No major academic concern,Exam pressure affecting real exam performance,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S024,8,English,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,medium,medium performer with medium risk
+S024,8,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S024,8,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S025,9,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S025,9,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,high performer with low risk
+S025,9,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S026,3,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,high performer with low risk
+S026,3,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S026,3,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S027,10,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S027,10,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S027,10,Science,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,high,medium performer with medium risk
+S028,12,English,Consistently low and declining performance,None observed,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,high,low performer with high risk
+S028,12,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S028,12,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S029,2,English,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S029,2,Math,Consistently low and declining performance,None observed,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,high,low performer with high risk
+S029,2,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S030,3,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S030,3,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S030,3,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S031,6,English,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S031,6,Math,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,high,high performer with medium risk
+S031,6,Science,Consistently low and declining performance,None observed,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,high,low performer with high risk
+S032,6,English,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,medium,high performer with medium risk
+S032,6,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S032,6,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S033,11,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S033,11,Math,No major academic concern,Exam pressure affecting real exam performance,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,high performer with low risk
+S033,11,Science,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,medium,medium performer with medium risk
+S034,8,English,Consistently low and declining performance,None observed,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,high,low performer with high risk
+S034,8,Math,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,medium,medium performer with medium risk
+S034,8,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S035,6,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S035,6,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S035,6,Science,Low overall performance,Exam pressure affecting real exam performance,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S036,7,English,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,medium,high performer with medium risk
+S036,7,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S036,7,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S037,8,English,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S037,8,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S037,8,Science,Consistently low and declining performance,None observed,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,high,low performer with high risk
+S038,5,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S038,5,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S038,5,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S039,6,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S039,6,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S039,6,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S040,6,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S040,6,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S040,6,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S041,10,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S041,10,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S041,10,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S042,11,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S042,11,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S042,11,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S043,9,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S043,9,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk
+S043,9,Science,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,high,medium performer with medium risk
+S044,5,English,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,high,high performer with medium risk
+S044,5,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S044,5,Science,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,high,medium performer with medium risk
+S045,11,English,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S045,11,Math,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,medium,medium performer with medium risk
+S045,11,Science,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,high performer with low risk
+S046,9,English,No major academic concern,Exam pressure affecting real exam performance,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S046,9,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S046,9,Science,Consistently low and declining performance,None observed,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,high,low performer with high risk
+S047,1,English,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,high,medium performer with medium risk
+S047,1,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S047,1,Science,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,medium,medium performer with medium risk
+S048,9,English,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,high,high performer with medium risk
+S048,9,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S048,9,Science,Consistently low and declining performance,None observed,Conceptual gaps with poor reinforcement,high,high,Immediate concept revision and guided practice,yes,high,low performer with high risk
+S049,5,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,medium,medium performer with low risk
+S049,5,Math,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S049,5,Science,Performance regression,None observed,Inconsistent preparation or focus,medium,medium,Structured revision and consistency building,no,high,medium performer with medium risk
+S050,10,English,No major academic concern,None observed,Healthy learning pattern,low,low,Maintain current learning approach,no,high,medium performer with low risk
+S050,10,Math,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,high,low performer with medium risk
+S050,10,Science,Low overall performance,None observed,Weak foundational understanding,medium,medium,Structured revision and consistency building,no,medium,low performer with medium risk

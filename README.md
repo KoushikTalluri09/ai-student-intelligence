@@ -21,6 +21,7 @@ Faculty-level academic analytics and AI-driven insights built with data validati
 
 
 
+
 **1️-  Project Overview**
 
 AI Student Intelligence is a full-stack academic intelligence system that transforms raw exam scores into:
@@ -31,7 +32,7 @@ AI Student Intelligence is a full-stack academic intelligence system that transf
 🎓 Student-level consolidated reports
 🖥️ A polished, interactive UI
 
-The system is not a demo, it is a production-style platform with strict validation, deterministic pipelines, explainability, and auditability.
+
 
 **2- Why This Project Exists**
 
@@ -42,6 +43,8 @@ AI outputs are not explainable
 Systems overwrite data silently
 There is no trust layer
 UI is disconnected from backend reality
+
+
 
 **3️- What Problems This Solves For Students**
 
@@ -63,20 +66,13 @@ For Institutions
 
 **4️- High-Level Architecture**
 
-Raw Exam Data
-      ↓
+Raw Exam Data 
 [Phase 0] Validation
-      ↓
 [Phase 1] Subject Analytics
-      ↓
 [Phase 2] Insights + Explainability
-      ↓
 [Phase 3] LLM Subject Summaries
-      ↓
 [Phase 4] Student Consolidation
-      ↓
 FastAPI (Cached + Live)
-      ↓
 Streamlit UI
 
 

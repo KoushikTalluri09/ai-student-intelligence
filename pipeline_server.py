@@ -22,7 +22,7 @@ from insights.student_consolidator import generate_consolidated_summary
 app = FastAPI(
     title="AI Student Intelligence API",
     description="Production-grade hybrid academic intelligence service",
-    version="2.4.0",
+    version="2.5.0",
 )
 
 # =====================================================
@@ -64,33 +64,34 @@ def df_to_records(df: pd.DataFrame):
     return [{k: normalize(v) for k, v in row.items()} for row in records]
 
 # =====================================================
-# DATA LOADERS
+# DATA LOADERS (SAFE)
 # =====================================================
 
 def load_tables():
     client = get_gs_client()
     sheet = get_spreadsheet(client)
 
-    analytics = read_table(sheet, "subject_analytics")
-    summaries = read_table(sheet, "subject_summaries")
-    insights = read_table(sheet, "subject_insights")
-    consolidated = read_table(sheet, "student_consolidated_latest")
-    validated = read_table(sheet, "validated_results")
-
-    if analytics.empty or summaries.empty or consolidated.empty or validated.empty:
-        raise RuntimeError("One or more required sheets are empty")
-
-    return analytics, summaries, insights, consolidated, validated
+    return (
+        read_table(sheet, "subject_analytics"),
+        read_table(sheet, "subject_summaries"),
+        read_table(sheet, "subject_insights"),
+        read_table(sheet, "student_consolidated_latest"),
+        read_table(sheet, "validated_results"),
+    )
 
 
 def get_student_metadata(validated: pd.DataFrame, student_id: str):
+    if validated is None or validated.empty:
+        return {"student_name": "", "grade": ""}
+
     row = validated[validated["student_id"] == student_id]
     if row.empty:
         return {"student_name": "", "grade": ""}
+
     r = row.iloc[0]
     return {
         "student_name": normalize(r.get("Name", "")),
-        "grade": int(r.get("grade")),
+        "grade": int(r.get("grade")) if r.get("grade") != "" else "",
     }
 
 # =====================================================
@@ -100,13 +101,22 @@ def get_student_metadata(validated: pd.DataFrame, student_id: str):
 def load_cached(student_id: str):
     analytics, summaries, insights, consolidated, validated = load_tables()
 
+    if analytics.empty or summaries.empty or consolidated.empty:
+        raise HTTPException(
+            status_code=404,
+            detail="Cached academic data not available. Run pipeline first."
+        )
+
     a = analytics[analytics["student_id"] == student_id]
     s = summaries[summaries["student_id"] == student_id]
     i = insights[insights["student_id"] == student_id]
     c = consolidated[consolidated["student_id"] == student_id]
 
     if a.empty or s.empty or c.empty:
-        raise ValueError(f"No cached data found for student_id={student_id}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"No cached data found for student_id={student_id}"
+        )
 
     meta = get_student_metadata(validated, student_id)
     row = c.iloc[0]
@@ -120,14 +130,10 @@ def load_cached(student_id: str):
         for r in df_to_records(i)
     }
 
-    subject_insights = []
-    for subj in df_to_records(s):
-        subject_insights.append(
-            {
-                **subj,
-                "explainability": explain_map.get(subj["subject"], {}),
-            }
-        )
+    subject_insights = [
+        {**subj, "explainability": explain_map.get(subj["subject"], {})}
+        for subj in df_to_records(s)
+    ]
 
     return {
         "student_id": student_id,
@@ -136,15 +142,8 @@ def load_cached(student_id: str):
         "overall_summary": normalize(row.get("overall_summary")),
         "recommended_next_steps": normalize(row.get("recommended_next_steps")),
         "numerical_performance": df_to_records(
-            a[
-                [
-                    "subject",
-                    "average_score",
-                    "latest_score",
-                    "trend",
-                    "risk_flag",
-                ]
-            ].sort_values("subject")
+            a[["subject", "average_score", "latest_score", "trend", "risk_flag"]]
+            .sort_values("subject")
         ),
         "subject_summaries": subject_insights,
         "mode": "cached",
@@ -157,51 +156,49 @@ def load_cached(student_id: str):
 
 @app.post("/student-summary")
 def get_cached_summary(req: StudentSummaryRequest):
-    try:
-        return load_cached(req.student_id.strip())
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    student_id = req.student_id.strip()
+    if not student_id:
+        raise HTTPException(status_code=400, detail="student_id required")
+    return load_cached(student_id)
 
 
 @app.post("/student-summary/live")
 def get_live_summary(req: LiveStudentSummaryRequest):
-    try:
-        student_id = req.student_id.strip()
-        os.environ["LLM_PROVIDER"] = req.llm_provider.lower()
+    student_id = req.student_id.strip()
+    if not student_id:
+        raise HTTPException(status_code=400, detail="student_id required")
 
-        analytics, summaries, _, _, validated = load_tables()
+    os.environ["LLM_PROVIDER"] = req.llm_provider.lower()
 
-        a = analytics[analytics["student_id"] == student_id]
-        s = summaries[summaries["student_id"] == student_id]
+    analytics, summaries, _, _, validated = load_tables()
 
-        if a.empty or s.empty:
-            raise ValueError(f"No data found for student_id={student_id}")
+    a = analytics[analytics["student_id"] == student_id]
+    s = summaries[summaries["student_id"] == student_id]
 
-        meta = get_student_metadata(validated, student_id)
-
-        consolidated = generate_consolidated_summary(
-            student_id=student_id,
-            grade=meta["grade"],
-            analytics=df_to_records(a),
-            summaries=df_to_records(s),
-            llm_provider=req.llm_provider,
+    if a.empty or s.empty:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No base data found for student_id={student_id}"
         )
 
-        return {
-            **consolidated,
-            "student_id": student_id,
-            "student_name": meta["student_name"],
-            "grade": meta["grade"],
-            "mode": "live",
-            "llm_provider_used": req.llm_provider,
-        }
+    meta = get_student_metadata(validated, student_id)
 
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    consolidated = generate_consolidated_summary(
+        student_id=student_id,
+        grade=meta["grade"],
+        analytics=df_to_records(a),
+        summaries=df_to_records(s),
+        llm_provider=req.llm_provider,
+    )
+
+    return {
+        **consolidated,
+        "student_id": student_id,
+        "student_name": meta["student_name"],
+        "grade": meta["grade"],
+        "mode": "live",
+        "llm_provider_used": req.llm_provider,
+    }
 
 
 @app.get("/")

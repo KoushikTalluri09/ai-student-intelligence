@@ -13,18 +13,18 @@ from typing import List
 from config.app_config import GOOGLE_SHEETS_DB_NAME
 
 # =====================================================
-# AUTH (RENDER + LOCAL SAFE)
+# CREDENTIAL LOADER (RENDER + LOCAL SAFE)
 # =====================================================
 
 def _load_credentials_file() -> str:
     """
-    Supports:
-    - Local file path (GOOGLE_SHEETS_CREDENTIALS)
-    - Render Base64 env var (GOOGLE_CREDENTIALS_BASE64)
+    Loads Google credentials from:
+    1) GOOGLE_CREDENTIALS_BASE64 (Render / prod)
+    2) GOOGLE_SHEETS_CREDENTIALS (local file path)
     """
-
-    # Case 1: Base64 credentials (Render)
     b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
+    path = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
+
     if b64:
         decoded = base64.b64decode(b64).decode("utf-8")
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
@@ -32,8 +32,6 @@ def _load_credentials_file() -> str:
         tmp.close()
         return tmp.name
 
-    # Case 2: Local file
-    path = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
     if path and os.path.exists(path):
         return path
 
@@ -42,6 +40,9 @@ def _load_credentials_file() -> str:
         "Set GOOGLE_CREDENTIALS_BASE64 (Render) or GOOGLE_SHEETS_CREDENTIALS (local)."
     )
 
+# =====================================================
+# AUTH
+# =====================================================
 
 def get_gs_client() -> gspread.Client:
     scopes = [
@@ -54,9 +55,7 @@ def get_gs_client() -> gspread.Client:
         cred_file,
         scopes=scopes,
     )
-
     return gspread.authorize(credentials)
-
 
 def get_spreadsheet(client: gspread.Client) -> gspread.Spreadsheet:
     return client.open(GOOGLE_SHEETS_DB_NAME)
@@ -85,7 +84,6 @@ def read_table(spreadsheet: gspread.Spreadsheet, table_name: str) -> pd.DataFram
 
     headers = values[0]
     rows = values[1:]
-
     return pd.DataFrame(rows, columns=headers)
 
 # =====================================================
@@ -107,7 +105,6 @@ def write_table(spreadsheet, table_name: str, df: pd.DataFrame):
 
     ws.update([df.columns.tolist()] + df.values.tolist())
 
-
 def append_table(spreadsheet, table_name: str, df: pd.DataFrame):
     if df is None or df.empty:
         return
@@ -120,7 +117,7 @@ def append_table(spreadsheet, table_name: str, df: pd.DataFrame):
     except gspread.WorksheetNotFound:
         ws = spreadsheet.add_worksheet(
             title=table_name,
-            rows="100",
+            rows=str(max(len(df) + 10, 100)),
             cols=str(len(df.columns) + 5),
         )
         values = []
@@ -130,7 +127,6 @@ def append_table(spreadsheet, table_name: str, df: pd.DataFrame):
         ws.update([df.columns.tolist()] + df.values.tolist())
     else:
         ws.append_rows(df.values.tolist(), value_input_option="USER_ENTERED")
-
 
 def upsert_table(spreadsheet, table_name: str, df: pd.DataFrame, key_columns: List[str]):
     df = _sanitize_df(df)
@@ -148,5 +144,4 @@ def upsert_table(spreadsheet, table_name: str, df: pd.DataFrame, key_columns: Li
         df[key_columns].apply(tuple, axis=1)
     )
     final_df = pd.concat([existing[mask], df], ignore_index=True)
-
     write_table(spreadsheet, table_name, final_df)

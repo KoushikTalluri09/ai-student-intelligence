@@ -3,43 +3,55 @@
 import os
 import json
 import base64
-from typing import List
-
+import tempfile
 import pandas as pd
 import numpy as np
 import gspread
 from google.oauth2.service_account import Credentials
+from typing import List
 
 from config.app_config import GOOGLE_SHEETS_DB_NAME
 
 # =====================================================
-# AUTH — RENDER SAFE (BASE64, NO FILES)
+# AUTH (RENDER + LOCAL SAFE)
 # =====================================================
 
-def get_gs_client() -> gspread.Client:
+def _load_credentials_file() -> str:
     """
-    Authenticate using GOOGLE_CREDENTIALS_BASE64
-    (Required for Render / cloud deployments)
+    Supports:
+    - Local file path (GOOGLE_SHEETS_CREDENTIALS)
+    - Render Base64 env var (GOOGLE_CREDENTIALS_BASE64)
     """
 
+    # Case 1: Base64 credentials (Render)
+    b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
+    if b64:
+        decoded = base64.b64decode(b64).decode("utf-8")
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
+        tmp.write(decoded.encode("utf-8"))
+        tmp.close()
+        return tmp.name
+
+    # Case 2: Local file
+    path = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
+    if path and os.path.exists(path):
+        return path
+
+    raise RuntimeError(
+        "Google Sheets credentials not found. "
+        "Set GOOGLE_CREDENTIALS_BASE64 (Render) or GOOGLE_SHEETS_CREDENTIALS (local)."
+    )
+
+
+def get_gs_client() -> gspread.Client:
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
 
-    creds_b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
-    if not creds_b64:
-        raise RuntimeError("GOOGLE_CREDENTIALS_BASE64 environment variable not set")
-
-    try:
-        creds_json = json.loads(
-            base64.b64decode(creds_b64).decode("utf-8")
-        )
-    except Exception as e:
-        raise RuntimeError("Invalid GOOGLE_CREDENTIALS_BASE64 value") from e
-
-    credentials = Credentials.from_service_account_info(
-        creds_json,
+    cred_file = _load_credentials_file()
+    credentials = Credentials.from_service_account_file(
+        cred_file,
         scopes=scopes,
     )
 
@@ -47,12 +59,10 @@ def get_gs_client() -> gspread.Client:
 
 
 def get_spreadsheet(client: gspread.Client) -> gspread.Spreadsheet:
-    if not GOOGLE_SHEETS_DB_NAME:
-        raise RuntimeError("GOOGLE_SHEETS_DB_NAME not set")
     return client.open(GOOGLE_SHEETS_DB_NAME)
 
 # =====================================================
-# SANITIZER (ABSOLUTE)
+# SANITIZER
 # =====================================================
 
 def _sanitize_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -63,13 +73,10 @@ def _sanitize_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # =====================================================
-# READ (HEADER SAFE)
+# READ
 # =====================================================
 
-def read_table(
-    spreadsheet: gspread.Spreadsheet,
-    table_name: str,
-) -> pd.DataFrame:
+def read_table(spreadsheet: gspread.Spreadsheet, table_name: str) -> pd.DataFrame:
     worksheet = spreadsheet.worksheet(table_name)
     values = worksheet.get_all_values()
 
@@ -82,77 +89,50 @@ def read_table(
     return pd.DataFrame(rows, columns=headers)
 
 # =====================================================
-# WRITE (HEADER FIRST)
+# WRITE
 # =====================================================
 
-def write_table(
-    spreadsheet: gspread.Spreadsheet,
-    table_name: str,
-    df: pd.DataFrame,
-):
+def write_table(spreadsheet, table_name: str, df: pd.DataFrame):
     df = _sanitize_df(df)
 
     try:
-        worksheet = spreadsheet.worksheet(table_name)
-        worksheet.clear()
+        ws = spreadsheet.worksheet(table_name)
+        ws.clear()
     except gspread.WorksheetNotFound:
-        worksheet = spreadsheet.add_worksheet(
+        ws = spreadsheet.add_worksheet(
             title=table_name,
             rows=str(max(len(df) + 10, 100)),
             cols=str(len(df.columns) + 5),
         )
 
-    worksheet.update(
-        [df.columns.tolist()] + df.values.tolist()
-    )
+    ws.update([df.columns.tolist()] + df.values.tolist())
 
-# =====================================================
-# APPEND
-# =====================================================
 
-def append_table(
-    spreadsheet: gspread.Spreadsheet,
-    table_name: str,
-    df: pd.DataFrame,
-):
+def append_table(spreadsheet, table_name: str, df: pd.DataFrame):
     if df is None or df.empty:
         return
 
     df = _sanitize_df(df)
 
     try:
-        worksheet = spreadsheet.worksheet(table_name)
-        values = worksheet.get_all_values()
+        ws = spreadsheet.worksheet(table_name)
+        values = ws.get_all_values()
     except gspread.WorksheetNotFound:
-        worksheet = spreadsheet.add_worksheet(
+        ws = spreadsheet.add_worksheet(
             title=table_name,
-            rows=str(max(len(df) + 10, 100)),
+            rows="100",
             cols=str(len(df.columns) + 5),
         )
         values = []
 
-    # If headers mismatch → rewrite
     if not values or values[0] != df.columns.tolist():
-        worksheet.clear()
-        worksheet.update(
-            [df.columns.tolist()] + df.values.tolist()
-        )
+        ws.clear()
+        ws.update([df.columns.tolist()] + df.values.tolist())
     else:
-        worksheet.append_rows(
-            df.values.tolist(),
-            value_input_option="USER_ENTERED",
-        )
+        ws.append_rows(df.values.tolist(), value_input_option="USER_ENTERED")
 
-# =====================================================
-# UPSERT (IDEMPOTENT)
-# =====================================================
 
-def upsert_table(
-    spreadsheet: gspread.Spreadsheet,
-    table_name: str,
-    df: pd.DataFrame,
-    key_columns: List[str],
-):
+def upsert_table(spreadsheet, table_name: str, df: pd.DataFrame, key_columns: List[str]):
     df = _sanitize_df(df)
 
     try:
@@ -167,9 +147,6 @@ def upsert_table(
     mask = ~existing[key_columns].apply(tuple, axis=1).isin(
         df[key_columns].apply(tuple, axis=1)
     )
-
-    cleaned = existing[mask]
-    final_df = pd.concat([cleaned, df], ignore_index=True)
-    final_df = _sanitize_df(final_df)
+    final_df = pd.concat([existing[mask], df], ignore_index=True)
 
     write_table(spreadsheet, table_name, final_df)

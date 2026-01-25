@@ -1,12 +1,11 @@
 fastapi
 uvicorn
+pydantic
 pandas
 numpy
-streamlit
 requests
 python-dotenv
-
-google-api-python-client
+gspread
 google-auth
 google-auth-oauthlib
 google-auth-httplib2

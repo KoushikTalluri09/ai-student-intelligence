@@ -1,33 +1,55 @@
-﻿import pandas as pd
+﻿# -*- coding: utf-8 -*-
+
+import os
+import json
+import base64
+from typing import List
+
+import pandas as pd
 import numpy as np
 import gspread
 from google.oauth2.service_account import Credentials
-from typing import List
 
-from config.app_config import (
-    GOOGLE_SHEETS_CREDENTIALS,
-    GOOGLE_SHEETS_DB_NAME,
-)
+from config.app_config import GOOGLE_SHEETS_DB_NAME
 
 # =====================================================
-# AUTH
+# AUTH — RENDER SAFE (BASE64, NO FILES)
 # =====================================================
 
 def get_gs_client() -> gspread.Client:
+    """
+    Authenticate using GOOGLE_CREDENTIALS_BASE64
+    (Required for Render / cloud deployments)
+    """
+
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
-    credentials = Credentials.from_service_account_file(
-        GOOGLE_SHEETS_CREDENTIALS,
+
+    creds_b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
+    if not creds_b64:
+        raise RuntimeError("GOOGLE_CREDENTIALS_BASE64 environment variable not set")
+
+    try:
+        creds_json = json.loads(
+            base64.b64decode(creds_b64).decode("utf-8")
+        )
+    except Exception as e:
+        raise RuntimeError("Invalid GOOGLE_CREDENTIALS_BASE64 value") from e
+
+    credentials = Credentials.from_service_account_info(
+        creds_json,
         scopes=scopes,
     )
+
     return gspread.authorize(credentials)
 
 
 def get_spreadsheet(client: gspread.Client) -> gspread.Spreadsheet:
+    if not GOOGLE_SHEETS_DB_NAME:
+        raise RuntimeError("GOOGLE_SHEETS_DB_NAME not set")
     return client.open(GOOGLE_SHEETS_DB_NAME)
-
 
 # =====================================================
 # SANITIZER (ABSOLUTE)
@@ -40,9 +62,8 @@ def _sanitize_df(df: pd.DataFrame) -> pd.DataFrame:
     df.replace([np.nan, np.inf, -np.inf], "", inplace=True)
     return df
 
-
 # =====================================================
-# READ (HEADER-SAFE)
+# READ (HEADER SAFE)
 # =====================================================
 
 def read_table(
@@ -60,9 +81,8 @@ def read_table(
 
     return pd.DataFrame(rows, columns=headers)
 
-
 # =====================================================
-# WRITE (HEADER-FIRST, GUARANTEED)
+# WRITE (HEADER FIRST)
 # =====================================================
 
 def write_table(
@@ -86,6 +106,9 @@ def write_table(
         [df.columns.tolist()] + df.values.tolist()
     )
 
+# =====================================================
+# APPEND
+# =====================================================
 
 def append_table(
     spreadsheet: gspread.Spreadsheet,
@@ -108,7 +131,7 @@ def append_table(
         )
         values = []
 
-    # If no headers → WRITE HEADERS + DATA
+    # If headers mismatch → rewrite
     if not values or values[0] != df.columns.tolist():
         worksheet.clear()
         worksheet.update(
@@ -120,6 +143,9 @@ def append_table(
             value_input_option="USER_ENTERED",
         )
 
+# =====================================================
+# UPSERT (IDEMPOTENT)
+# =====================================================
 
 def upsert_table(
     spreadsheet: gspread.Spreadsheet,
@@ -141,8 +167,8 @@ def upsert_table(
     mask = ~existing[key_columns].apply(tuple, axis=1).isin(
         df[key_columns].apply(tuple, axis=1)
     )
-    cleaned = existing[mask]
 
+    cleaned = existing[mask]
     final_df = pd.concat([cleaned, df], ignore_index=True)
     final_df = _sanitize_df(final_df)
 

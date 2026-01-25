@@ -6,8 +6,7 @@ import json
 # CONFIG
 # ============================================================
 
-BASE_API = "https://student-api.onrender.com"
-
+BASE_API = "https://ai-student-intelligence.onrender.com"
 CACHED_ENDPOINT = f"{BASE_API}/student-summary"
 LIVE_ENDPOINT = f"{BASE_API}/student-summary/live"
 
@@ -23,75 +22,66 @@ st.set_page_config(
 )
 
 # ============================================================
-# GLOBAL STYLES — ENTERPRISE / FLUENT UI
+# GLOBAL STYLES
 # ============================================================
 
 st.markdown(
     """
     <style>
-        body {
-            background-color: #eef2f7;
-            color: #0f172a;
-        }
+        body { background-color: #0b0f19; color: #e5e7eb; }
 
-        /* ---------- Brand ---------- */
         .brand {
-            font-size: 2rem;
+            font-size: 1.9rem;
             font-weight: 900;
-            color: #0b1f44;
-            letter-spacing: 0.4px;
+            color: #38bdf8;
         }
 
-        /* ---------- Page Title ---------- */
         .page-title h1 {
-            font-size: 2.7rem;
+            font-size: 2.6rem;
             font-weight: 900;
-            margin-bottom: 0.4rem;
+            color: #ffffff;
         }
 
         .page-title p {
-            color: #475569;
+            color: #94a3b8;
             font-size: 1.05rem;
         }
 
-        /* ---------- Section Containers ---------- */
         .section-card {
-            background: linear-gradient(180deg, #f8fafc, #eef2ff);
-            padding: 2.5rem;
-            border-radius: 24px;
-            margin-bottom: 3rem;
+            background: #111827;
+            padding: 2.2rem;
+            border-radius: 22px;
+            margin-bottom: 2.8rem;
             border-left: 6px solid #2563eb;
-            box-shadow: 0 14px 32px rgba(15,23,42,0.10);
+            box-shadow: 0 14px 32px rgba(0,0,0,0.45);
         }
 
         .section-title {
-            font-size: 1.7rem;
-            font-weight: 900;
-            margin-bottom: 1.8rem;
-            color: #0f172a;
+            font-size: 1.6rem;
+            font-weight: 800;
+            margin-bottom: 1.6rem;
+            color: #ffffff;
         }
 
-        /* ---------- Student Summary Header ---------- */
         .student-summary-title {
             text-align: center;
             font-size: 2.4rem;
             font-weight: 900;
-            color: #2563eb;
-            margin: 3.5rem 0 2.8rem 0;
+            color: #60a5fa;
+            margin: 3.5rem 0 2.5rem 0;
         }
 
-        /* ---------- Score Cards ---------- */
         .score-card {
-            background-color: #ffffff;
-            padding: 2rem 1.6rem;
-            border-radius: 22px;
+            background-color: #020617;
+            padding: 1.9rem;
+            border-radius: 20px;
             border-left: 8px solid;
-            box-shadow: 0 12px 26px rgba(15,23,42,0.12);
             text-align: center;
+            box-shadow: 0 10px 26px rgba(0,0,0,0.5);
         }
 
         .score-title {
-            font-size: 1.2rem;
+            font-size: 1.15rem;
             font-weight: 800;
             margin-bottom: 0.6rem;
         }
@@ -99,41 +89,29 @@ st.markdown(
         .score-value {
             font-size: 3rem;
             font-weight: 900;
-            margin-bottom: 0.4rem;
         }
 
         .score-meta {
             font-size: 0.95rem;
-            color: #475569;
-            line-height: 1.7;
+            color: #cbd5f5;
+            line-height: 1.6;
         }
 
-        .green { border-color: #16a34a; }
+        .green { border-color: #22c55e; }
         .amber { border-color: #f59e0b; }
-        .red { border-color: #dc2626; }
+        .red { border-color: #ef4444; }
 
-        /* ---------- SUBJECT EXPANDERS ---------- */
         div[data-testid="stExpander"] summary {
-            font-size: 1.2rem !important;
+            font-size: 1.15rem !important;
             font-weight: 800 !important;
-            color: #0f172a !important;
-            padding: 1.1rem 1.3rem !important;
-            border-radius: 16px;
-            background-color: #f1f5f9;
+            color: #ffffff !important;
+            background-color: #020617;
+            padding: 1.1rem 1.3rem;
+            border-radius: 14px;
         }
 
         div[data-testid="stExpander"] summary:hover {
-            background-color: #e0e7ff;
-        }
-
-        div[data-testid="stExpander"] div {
-            font-size: 1rem;
-            color: #1e293b;
-        }
-
-        /* ---------- Inputs ---------- */
-        input, select {
-            border-radius: 12px !important;
+            background-color: #1e293b;
         }
     </style>
     """,
@@ -248,7 +226,7 @@ if generate:
         response = requests.post(endpoint, json=payload, timeout=180)
 
     if response.status_code != 200:
-        st.error(response.text)
+        st.error("Student not found or backend error.")
         st.stop()
 
     data = response.json()
@@ -257,15 +235,15 @@ if generate:
     # STUDENT HEADER
     # ========================================================
 
-    name = data.get("student_name", "").strip()
+    name = data.get("student_name", "")
     grade = data.get("grade", "")
 
     if name:
         st.markdown(
             f"""
-            <div style="text-align:center; margin:3.8rem 0 2rem 0;">
-                <h1 style="font-size:3.3rem; font-weight:900;">{name.upper()}</h1>
-                <p style="color:#475569; font-size:1.1rem;">Grade {grade}</p>
+            <div style="text-align:center; margin:3.5rem 0;">
+                <h1 style="font-size:3.2rem; font-weight:900;">{name.upper()}</h1>
+                <p style="color:#94a3b8;">Grade {grade}</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -277,7 +255,7 @@ if generate:
         )
 
     # ========================================================
-    # ACADEMIC OVERVIEW
+    # OVERVIEW
     # ========================================================
 
     if data.get("overall_summary"):
@@ -285,14 +263,14 @@ if generate:
             f"""
             <div class="section-card">
                 <div class="section-title">📘 Academic Overview</div>
-                <p>{data["overall_summary"]}</p>
+                <p>{data['overall_summary']}</p>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     # ========================================================
-    # PERFORMANCE AT A GLANCE
+    # PERFORMANCE
     # ========================================================
 
     numeric = data.get("numerical_performance", [])
@@ -310,9 +288,9 @@ if generate:
                         <div class="score-title">{dot} {row['subject']}</div>
                         <div class="score-value">{row['latest_score']}</div>
                         <div class="score-meta">
-                            Average: {row['average_score']}<br/>
+                            Avg: {row['average_score']}<br/>
                             {trend_icon(row.get('trend'))}<br/>
-                            Risk Level: {row['risk_flag']}
+                            Risk: {row['risk_flag']}
                         </div>
                     </div>
                     """,
@@ -322,58 +300,28 @@ if generate:
         st.markdown("</div>", unsafe_allow_html=True)
 
     # ========================================================
-    # SUBJECT INSIGHTS — ICONS + BOLD
+    # SUBJECT INSIGHTS
     # ========================================================
 
-    subject_icons = {
-        "English": "📘",
-        "Math": "➗",
-        "Science": "🔬",
-    }
-
+    subject_icons = {"English": "📘", "Math": "➗", "Science": "🔬"}
     subjects = data.get("subject_summaries", [])
+
     if subjects:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">📚 Subject Insights & Guidance</div>', unsafe_allow_html=True)
 
         for subj in subjects:
             icon = subject_icons.get(subj["subject"], "📖")
-            label = f"{icon}  {subj['subject']}"
-
-            with st.expander(label, expanded=False):
-                st.markdown("**Current Performance**")
+            with st.expander(f"{icon} {subj['subject']}"):
                 st.write(subj.get("performance_summary",""))
-
-                st.markdown("**Improvement Plan**")
                 st.write(subj.get("improvement_plan",""))
-
-                st.markdown("**Encouragement**")
                 st.write(subj.get("motivation_note",""))
-
-                explain = subj.get("explainability", {})
-                if explain:
-                    st.divider()
-                    st.markdown("**Why this matters**")
-                    st.write(explain.get("explanation_summary",""))
-                    for e in normalize_evidence(explain.get("key_evidence_points")):
-                        st.info(e)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
     # ========================================================
-    # NEXT STEPS
+    # FOOTER
     # ========================================================
-
-    if data.get("recommended_next_steps"):
-        st.markdown(
-            f"""
-            <div class="section-card">
-                <div class="section-title">🧭 What to Focus on Next</div>
-                <p>{data["recommended_next_steps"]}</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
 
     st.caption(
         f"Mode: {data.get('mode', mode)} | Engine: {data.get('llm_provider_used','pipeline')}"

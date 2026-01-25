@@ -24,7 +24,7 @@ from storage.google_sheets import (
 
 REQUIRED_COLUMNS = [
     "student_id",
-    "Name",               # ✅ ADDED (metadata passthrough)
+    "Name",
     "grade",
     "subject",
     "exam_id",
@@ -34,6 +34,7 @@ REQUIRED_COLUMNS = [
     "max_score",
     "exam_date",
 ]
+
 
 ALLOWED_EXAM_TYPES = {"mock", "real"}
 

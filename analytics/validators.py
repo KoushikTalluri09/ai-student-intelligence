@@ -6,22 +6,9 @@ PHASE 0 — RAW DATA INGESTION & VALIDATION
 
 Source of truth  : raw_student_scores (Google Sheets)
 Validated output : validated_results (Google Sheets)
-
-Responsibilities:
-- Schema enforcement
-- Type coercion
-- Domain validation
-- Temporal validation (UTC-safe)
-- Uniqueness enforcement
-- Google Sheets–safe serialization
-
-Design principles:
-- Fail fast, fail loud
-- Never mutate raw source
-- Deterministic, auditable output
 """
 
-from datetime import datetime, timezone
+from datetime import timezone
 import pandas as pd
 
 from storage.google_sheets import (
@@ -37,6 +24,7 @@ from storage.google_sheets import (
 
 REQUIRED_COLUMNS = [
     "student_id",
+    "Name",               # ✅ ADDED (metadata passthrough)
     "grade",
     "subject",
     "exam_id",
@@ -66,13 +54,14 @@ def validate_schema(df: pd.DataFrame):
         )
 
 # ============================================================
-# TYPE COERCION (CRITICAL)
+# TYPE COERCION
 # ============================================================
 
 def coerce_types(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     df["student_id"] = df["student_id"].astype(str)
+    df["Name"] = df["Name"].astype(str)          # ✅ SAFE PASS-THROUGH
     df["grade"] = pd.to_numeric(df["grade"], errors="coerce")
     df["attempt_number"] = pd.to_numeric(df["attempt_number"], errors="coerce")
     df["score"] = pd.to_numeric(df["score"], errors="coerce")
@@ -82,7 +71,7 @@ def coerce_types(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ============================================================
-# ROW-LEVEL VALIDATION (UTC SAFE)
+# ROW-LEVEL VALIDATION
 # ============================================================
 
 def validate_rows(df: pd.DataFrame):
@@ -91,37 +80,30 @@ def validate_rows(df: pd.DataFrame):
 
     for idx, row in df.iterrows():
         try:
-            # ---- Identity ----
-            if not isinstance(row["student_id"], str) or not row["student_id"].strip():
-                raise ValueError("student_id missing or invalid")
+            if not row["student_id"].strip():
+                raise ValueError("student_id missing")
 
-            # ---- Grade ----
             if pd.isna(row["grade"]) or not (1 <= int(row["grade"]) <= 12):
-                raise ValueError("grade out of range (1–12)")
+                raise ValueError("grade out of range")
 
-            # ---- Subject ----
-            if not isinstance(row["subject"], str) or not row["subject"].strip():
+            if not row["subject"].strip():
                 raise ValueError("invalid subject")
 
-            # ---- Exam type ----
             if row["exam_type"] not in ALLOWED_EXAM_TYPES:
                 raise ValueError("invalid exam_type")
 
-            # ---- Attempt ----
             if pd.isna(row["attempt_number"]) or int(row["attempt_number"]) < 1:
-                raise ValueError("attempt_number < 1")
+                raise ValueError("invalid attempt_number")
 
-            # ---- Scores ----
             if pd.isna(row["max_score"]) or row["max_score"] <= 0:
-                raise ValueError("max_score must be > 0")
+                raise ValueError("invalid max_score")
 
             if pd.isna(row["score"]) or row["score"] < 0 or row["score"] > row["max_score"]:
-                raise ValueError("score outside valid range")
+                raise ValueError("score out of range")
 
-            # ---- Exam date ----
             exam_date = row["exam_date"]
             if pd.isna(exam_date):
-                raise ValueError("exam_date is invalid or missing")
+                raise ValueError("invalid exam_date")
 
             exam_date_utc = (
                 exam_date.tz_convert("UTC")
@@ -130,7 +112,7 @@ def validate_rows(df: pd.DataFrame):
             )
 
             if exam_date_utc > now_utc:
-                raise ValueError("exam_date is in the future")
+                raise ValueError("exam_date in future")
 
         except Exception as e:
             errors.append(
@@ -144,7 +126,7 @@ def validate_rows(df: pd.DataFrame):
     return errors
 
 # ============================================================
-# UNIQUENESS VALIDATION
+# UNIQUENESS
 # ============================================================
 
 def validate_uniqueness(df: pd.DataFrame):
@@ -152,51 +134,37 @@ def validate_uniqueness(df: pd.DataFrame):
         subset=["student_id", "exam_id", "attempt_number"]
     )
     if dupes.any():
-        raise ValueError(
-            "Duplicate rows detected for (student_id, exam_id, attempt_number)"
-        )
+        raise ValueError("Duplicate exam attempts detected")
 
 # ============================================================
 # PIPELINE ENTRY POINT
 # ============================================================
 
 def run_validation():
-    """
-    Phase 0 execution:
-    - Read raw_student_scores
-    - Validate & normalize
-    - Write validated_results
-    """
-
     client = get_gs_client()
     spreadsheet = get_spreadsheet(client)
 
-    # ---- READ RAW DATA ----
     df = read_table(spreadsheet, "raw_student_scores")
 
     if df.empty:
-        raise RuntimeError("raw_student_scores sheet is empty")
+        raise RuntimeError("raw_student_scores is empty")
 
-    # ---- VALIDATION ----
     validate_schema(df)
     df = coerce_types(df)
 
     row_errors = validate_rows(df)
     if row_errors:
-        raise ValueError(f"Row validation failed. Sample errors: {row_errors[:5]}")
+        raise ValueError(f"Row validation failed: {row_errors[:5]}")
 
     validate_uniqueness(df)
 
-    # ---- FINAL NORMALIZATION FOR GOOGLE SHEETS ----
     df["exam_date"] = df["exam_date"].dt.strftime("%Y-%m-%d")
 
-    # ---- DETERMINISTIC ORDER ----
     df = df.sort_values(
         by=["student_id", "exam_id", "attempt_number"],
         ignore_index=True,
     )
 
-    # ---- WRITE VALIDATED DATA ----
     write_table(
         spreadsheet=spreadsheet,
         table_name="validated_results",

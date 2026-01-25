@@ -6,7 +6,8 @@ import json
 # CONFIG
 # ============================================================
 
-BASE_API = "http://localhost:8000"
+BASE_API = "https://student-api.onrender.com"
+
 CACHED_ENDPOINT = f"{BASE_API}/student-summary"
 LIVE_ENDPOINT = f"{BASE_API}/student-summary/live"
 
@@ -15,103 +16,162 @@ LIVE_ENDPOINT = f"{BASE_API}/student-summary/live"
 # ============================================================
 
 st.set_page_config(
-    page_title="AI Student Intelligence",
+    page_title="STEM Globe | Student Intelligence",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 # ============================================================
-# GLOBAL STYLES (SAFE + FINAL)
+# GLOBAL STYLES — ENTERPRISE / FLUENT UI
 # ============================================================
 
 st.markdown(
     """
     <style>
-        body { background-color: #0b0f19; }
+        body {
+            background-color: #eef2f7;
+            color: #0f172a;
+        }
 
+        /* ---------- Brand ---------- */
+        .brand {
+            font-size: 2rem;
+            font-weight: 900;
+            color: #0b1f44;
+            letter-spacing: 0.4px;
+        }
+
+        /* ---------- Page Title ---------- */
+        .page-title h1 {
+            font-size: 2.7rem;
+            font-weight: 900;
+            margin-bottom: 0.4rem;
+        }
+
+        .page-title p {
+            color: #475569;
+            font-size: 1.05rem;
+        }
+
+        /* ---------- Section Containers ---------- */
         .section-card {
-            background-color: #ffffff;
-            padding: 1.8rem 2rem;
-            border-radius: 18px;
-            margin-bottom: 2rem;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 12px 28px rgba(0,0,0,0.08);
-            color: #020617;
+            background: linear-gradient(180deg, #f8fafc, #eef2ff);
+            padding: 2.5rem;
+            border-radius: 24px;
+            margin-bottom: 3rem;
+            border-left: 6px solid #2563eb;
+            box-shadow: 0 14px 32px rgba(15,23,42,0.10);
         }
 
         .section-title {
-            font-size: 1.55rem;
-            font-weight: 700;
-            margin-bottom: 1.2rem;
-            color: #020617;
+            font-size: 1.7rem;
+            font-weight: 900;
+            margin-bottom: 1.8rem;
+            color: #0f172a;
         }
 
-        .subtle {
-            color: #64748b;
-            font-size: 0.95rem;
+        /* ---------- Student Summary Header ---------- */
+        .student-summary-title {
+            text-align: center;
+            font-size: 2.4rem;
+            font-weight: 900;
+            color: #2563eb;
+            margin: 3.5rem 0 2.8rem 0;
         }
 
+        /* ---------- Score Cards ---------- */
         .score-card {
             background-color: #ffffff;
-            padding: 1.4rem;
-            border-radius: 16px;
-            border-left: 10px solid;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            padding: 2rem 1.6rem;
+            border-radius: 22px;
+            border-left: 8px solid;
+            box-shadow: 0 12px 26px rgba(15,23,42,0.12);
             text-align: center;
         }
 
         .score-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #020617;
+            font-size: 1.2rem;
+            font-weight: 800;
+            margin-bottom: 0.6rem;
         }
 
-        /* 🔥 FIX: force readable score color */
         .score-value {
-            font-size: 2.4rem;
-            font-weight: 800;
-            margin: 0.3rem 0;
-            color: #020617 !important;
+            font-size: 3rem;
+            font-weight: 900;
+            margin-bottom: 0.4rem;
         }
 
         .score-meta {
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             color: #475569;
-            line-height: 1.6;
+            line-height: 1.7;
         }
 
         .green { border-color: #16a34a; }
         .amber { border-color: #f59e0b; }
         .red { border-color: #dc2626; }
+
+        /* ---------- SUBJECT EXPANDERS ---------- */
+        div[data-testid="stExpander"] summary {
+            font-size: 1.2rem !important;
+            font-weight: 800 !important;
+            color: #0f172a !important;
+            padding: 1.1rem 1.3rem !important;
+            border-radius: 16px;
+            background-color: #f1f5f9;
+        }
+
+        div[data-testid="stExpander"] summary:hover {
+            background-color: #e0e7ff;
+        }
+
+        div[data-testid="stExpander"] div {
+            font-size: 1rem;
+            color: #1e293b;
+        }
+
+        /* ---------- Inputs ---------- */
+        input, select {
+            border-radius: 12px !important;
+        }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 # ============================================================
-# HEADER
+# TOP BAR
 # ============================================================
 
-st.markdown(
-    """
-    <div style="text-align:center; margin-bottom:1.5rem;">
-        <h1>🎓 AI Student Intelligence</h1>
-        <p class="subtle">
-            Faculty-grade academic insights powered by validated data & AI reasoning
-        </p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+l, c, r = st.columns([1.2, 2.6, 1.2])
+
+with l:
+    st.markdown('<div class="brand">STEM Globe</div>', unsafe_allow_html=True)
+
+with c:
+    st.markdown(
+        """
+        <div class="page-title" style="text-align:center;">
+            <h1>Student Intelligence Dashboard</h1>
+            <p>Clear academic insights for students, parents, and educators</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with r:
+    st.text_input("Username", placeholder="demo_user", label_visibility="collapsed")
+    st.text_input("Password", type="password", placeholder="••••••", label_visibility="collapsed")
+    st.button("Login")
 
 st.divider()
 
 # ============================================================
-# INPUT PANEL
+# STUDENT WORKSPACE
 # ============================================================
 
-st.markdown("### 🔎 Student Report Configuration")
+st.markdown("## 🎯 Student Workspace")
 
 c1, c2, c3 = st.columns(3)
 
@@ -120,26 +180,19 @@ with c1:
 
 with c2:
     llm_provider = st.selectbox(
-        "AI Reasoning Engine",
+        "Reasoning Engine",
         ["ollama", "openai", "claude", "gemini", "deepseek"],
     )
 
 with c3:
-    st.markdown("**Execution Mode**")
     if llm_provider == "ollama":
         mode = "cached"
-        st.success("⚡ Cached (Fast & Free)")
+        st.success("⚡ Fast Mode")
     else:
         mode = "live"
-        st.warning("🤖 Live (Uses selected LLM)")
+        st.warning("🤖 Live AI Mode")
 
-st.divider()
-
-generate = st.button(
-    "🚀 Generate Academic Report",
-    type="primary",
-    use_container_width=True,
-)
+generate = st.button("🚀 Generate Academic Report", use_container_width=True)
 
 # ============================================================
 # HELPERS
@@ -156,28 +209,25 @@ def score_color(score):
         return "amber", "🟠"
     return "red", "🔴"
 
-
 def trend_icon(trend):
     t = str(trend).lower()
-    if "up" in t or "+" in t:
+    if "up" in t:
         return "⬆️ Improving"
-    if "down" in t or "-" in t:
+    if "down" in t:
         return "⬇️ Declining"
     return "➖ Stable"
-
 
 def normalize_evidence(value):
     if not value:
         return []
     if isinstance(value, list):
-        return [str(v) for v in value if str(v).strip()]
+        return value
     if isinstance(value, str):
         try:
             parsed = json.loads(value)
-            if isinstance(parsed, list):
-                return [str(v) for v in parsed if str(v).strip()]
+            return parsed if isinstance(parsed, list) else [value]
         except Exception:
-            return [value.strip()]
+            return [value]
     return []
 
 # ============================================================
@@ -194,7 +244,7 @@ if generate:
     if mode == "live":
         payload["llm_provider"] = llm_provider
 
-    with st.spinner("Generating academic report..."):
+    with st.spinner("Preparing student report..."):
         response = requests.post(endpoint, json=payload, timeout=180)
 
     if response.status_code != 200:
@@ -204,117 +254,127 @@ if generate:
     data = response.json()
 
     # ========================================================
-    # OVERALL SUMMARY
+    # STUDENT HEADER
     # ========================================================
 
-    st.markdown(
-        f"""
-        <div class="section-card">
-            <div class="section-title">📘 Overall Academic Assessment</div>
-            <p>{data.get("overall_summary","—")}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    name = data.get("student_name", "").strip()
+    grade = data.get("grade", "")
+
+    if name:
+        st.markdown(
+            f"""
+            <div style="text-align:center; margin:3.8rem 0 2rem 0;">
+                <h1 style="font-size:3.3rem; font-weight:900;">{name.upper()}</h1>
+                <p style="color:#475569; font-size:1.1rem;">Grade {grade}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            '<div class="student-summary-title">Student Academic Summary</div>',
+            unsafe_allow_html=True,
+        )
 
     # ========================================================
-    # SUBJECT PERFORMANCE
+    # ACADEMIC OVERVIEW
     # ========================================================
 
-    st.markdown(
-        """
-        <div class="section-card">
-            <div class="section-title">📊 Subject Performance Snapshot</div>
-        """,
-        unsafe_allow_html=True,
-    )
+    if data.get("overall_summary"):
+        st.markdown(
+            f"""
+            <div class="section-card">
+                <div class="section-title">📘 Academic Overview</div>
+                <p>{data["overall_summary"]}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # ========================================================
+    # PERFORMANCE AT A GLANCE
+    # ========================================================
 
     numeric = data.get("numerical_performance", [])
-    cols = st.columns(len(numeric)) if numeric else []
+    if numeric:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📊 Performance at a Glance</div>', unsafe_allow_html=True)
 
-    for col, row in zip(cols, numeric):
-        with col:
-            color, dot = score_color(row.get("latest_score", 0))
-            st.markdown(
-                f"""
-                <div class="score-card {color}">
-                    <div class="score-title">{dot} {row['subject']}</div>
-                    <div class="score-value">{row['latest_score']}</div>
-                    <div class="score-meta">
-                        Avg: {row['average_score']}<br/>
-                        {trend_icon(row.get('trend'))}<br/>
-                        Risk: {row['risk_flag']}
+        cols = st.columns(len(numeric))
+        for col, row in zip(cols, numeric):
+            with col:
+                color, dot = score_color(row.get("latest_score", 0))
+                st.markdown(
+                    f"""
+                    <div class="score-card {color}">
+                        <div class="score-title">{dot} {row['subject']}</div>
+                        <div class="score-value">{row['latest_score']}</div>
+                        <div class="score-meta">
+                            Average: {row['average_score']}<br/>
+                            {trend_icon(row.get('trend'))}<br/>
+                            Risk Level: {row['risk_flag']}
+                        </div>
                     </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # ========================================================
-    # SUBJECT-LEVEL AI INSIGHTS
-    # ========================================================
-
-    st.markdown(
-        """
-        <div class="section-card">
-            <div class="section-title">📚 Subject-Level AI Insights</div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    for subj in data.get("subject_summaries", []):
-        with st.expander(f"📘 {subj['subject']}"):
-            st.markdown("**Performance Summary**")
-            st.write(subj.get("performance_summary",""))
-
-            st.markdown("**Improvement Plan**")
-            st.write(subj.get("improvement_plan",""))
-
-            st.markdown("**Motivation Note**")
-            st.write(subj.get("motivation_note",""))
-
-            explain = subj.get("explainability", {})
-            if explain:
-                st.divider()
-                st.markdown("**Why this insight?**")
-                st.write(explain.get("explanation_summary",""))
-
-                evidence = normalize_evidence(
-                    explain.get("key_evidence_points")
+                    """,
+                    unsafe_allow_html=True,
                 )
-                if evidence:
-                    st.markdown("**Evidence**")
-                    for e in evidence:
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ========================================================
+    # SUBJECT INSIGHTS — ICONS + BOLD
+    # ========================================================
+
+    subject_icons = {
+        "English": "📘",
+        "Math": "➗",
+        "Science": "🔬",
+    }
+
+    subjects = data.get("subject_summaries", [])
+    if subjects:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📚 Subject Insights & Guidance</div>', unsafe_allow_html=True)
+
+        for subj in subjects:
+            icon = subject_icons.get(subj["subject"], "📖")
+            label = f"{icon}  {subj['subject']}"
+
+            with st.expander(label, expanded=False):
+                st.markdown("**Current Performance**")
+                st.write(subj.get("performance_summary",""))
+
+                st.markdown("**Improvement Plan**")
+                st.write(subj.get("improvement_plan",""))
+
+                st.markdown("**Encouragement**")
+                st.write(subj.get("motivation_note",""))
+
+                explain = subj.get("explainability", {})
+                if explain:
+                    st.divider()
+                    st.markdown("**Why this matters**")
+                    st.write(explain.get("explanation_summary",""))
+                    for e in normalize_evidence(explain.get("key_evidence_points")):
                         st.info(e)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # ========================================================
-    # ✅ RECOMMENDED NEXT STEPS (RESTORED)
+    # NEXT STEPS
     # ========================================================
 
-    st.markdown(
-        f"""
-        <div class="section-card">
-            <div class="section-title">🧭 Recommended Next Steps</div>
-            <p>{data.get("recommended_next_steps","—")}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # ========================================================
-    # FOOTER
-    # ========================================================
+    if data.get("recommended_next_steps"):
+        st.markdown(
+            f"""
+            <div class="section-card">
+                <div class="section-title">🧭 What to Focus on Next</div>
+                <p>{data["recommended_next_steps"]}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     st.caption(
-        f"Mode: **{data.get('mode', mode)}** | "
-        f"LLM Used: **{data.get('llm_provider_used', 'pipeline')}**"
-    )
-
-    st.caption(
-        "Generated using validated academic data and AI-assisted reasoning. "
-        "Designed to support educators, students, and parents."
+        f"Mode: {data.get('mode', mode)} | Engine: {data.get('llm_provider_used','pipeline')}"
     )

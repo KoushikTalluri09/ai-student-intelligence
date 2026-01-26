@@ -212,6 +212,15 @@ def get_live_summary(req: LiveStudentSummaryRequest):
         "llm_provider_used": req.llm_provider,
     }
 
+@app.get("/debug/env")
+def debug_env():
+    return {
+        "GOOGLE_CREDENTIALS_BASE64_present": bool(os.getenv("GOOGLE_CREDENTIALS_BASE64")),
+        "GOOGLE_SHEETS_CREDENTIALS_present": bool(os.getenv("GOOGLE_SHEETS_CREDENTIALS")),
+        "all_env_keys": sorted(list(os.environ.keys()))
+    }
+
+
 
 @app.get("/")
 def health():

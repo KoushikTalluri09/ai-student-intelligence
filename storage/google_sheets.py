@@ -145,3 +145,4 @@ def upsert_table(spreadsheet, table_name: str, df: pd.DataFrame, key_columns: Li
     )
     final_df = pd.concat([existing[mask], df], ignore_index=True)
     write_table(spreadsheet, table_name, final_df)
+print("ENV VAR PRESENT:", bool(os.getenv("GOOGLE_CREDENTIALS_BASE64")))

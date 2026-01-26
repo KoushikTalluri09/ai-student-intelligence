@@ -22,96 +22,90 @@ st.set_page_config(
 )
 
 # ============================================================
-# GLOBAL STYLES
+# GLOBAL STYLES — CLEAN WORLD-CLASS UI
 # ============================================================
 
 st.markdown(
     """
     <style>
-        body { background-color: #0b0f19; color: #e5e7eb; }
+        body {
+            background-color: #f1f3f4;
+            color: #000000;
+        }
 
         .brand {
-            font-size: 1.9rem;
-            font-weight: 900;
-            color: #38bdf8;
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #1a73e8;
+            margin-bottom: 2px;
         }
 
         .page-title h1 {
-            font-size: 2.6rem;
-            font-weight: 900;
-            color: #ffffff;
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #000000;
+            margin-bottom: 2px;
         }
 
         .page-title p {
-            color: #94a3b8;
-            font-size: 1.05rem;
+            font-size: 0.95rem;
+            color: #444;
+            margin-top: 0px;
         }
 
-        .section-card {
-            background: #111827;
-            padding: 2.2rem;
-            border-radius: 22px;
-            margin-bottom: 2.8rem;
-            border-left: 6px solid #2563eb;
-            box-shadow: 0 14px 32px rgba(0,0,0,0.45);
+        .card {
+            background: #ffffff;
+            padding: 1.4rem;
+            border-radius: 14px;
+            margin-bottom: 1.4rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
         }
 
         .section-title {
-            font-size: 1.6rem;
-            font-weight: 800;
-            margin-bottom: 1.6rem;
-            color: #ffffff;
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #000000;
         }
 
-        .student-summary-title {
+        .metric-card {
+            background: #ffffff;
+            padding: 1.1rem;
+            border-radius: 12px;
+            border-left: 6px solid;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             text-align: center;
+        }
+
+        .metric-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .metric-value {
             font-size: 2.4rem;
-            font-weight: 900;
-            color: #60a5fa;
-            margin: 3.5rem 0 2.5rem 0;
-        }
-
-        .score-card {
-            background-color: #020617;
-            padding: 1.9rem;
-            border-radius: 20px;
-            border-left: 8px solid;
-            text-align: center;
-            box-shadow: 0 10px 26px rgba(0,0,0,0.5);
-        }
-
-        .score-title {
-            font-size: 1.15rem;
             font-weight: 800;
-            margin-bottom: 0.6rem;
+            margin: 2px 0;
         }
 
-        .score-value {
-            font-size: 3rem;
-            font-weight: 900;
+        .metric-meta {
+            font-size: 0.9rem;
+            color: #333;
+            line-height: 1.45;
         }
 
-        .score-meta {
-            font-size: 0.95rem;
-            color: #cbd5f5;
-            line-height: 1.6;
-        }
-
-        .green { border-color: #22c55e; }
-        .amber { border-color: #f59e0b; }
-        .red { border-color: #ef4444; }
+        .green { border-color: #34a853; }
+        .amber { border-color: #fbbc04; }
+        .red { border-color: #ea4335; }
 
         div[data-testid="stExpander"] summary {
             font-size: 1.15rem !important;
-            font-weight: 800 !important;
-            color: #ffffff !important;
-            background-color: #020617;
-            padding: 1.1rem 1.3rem;
-            border-radius: 14px;
-        }
-
-        div[data-testid="stExpander"] summary:hover {
-            background-color: #1e293b;
+            font-weight: 700 !important;
+            padding: 0.7rem 0.9rem !important;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
         }
     </style>
     """,
@@ -163,14 +157,13 @@ with c2:
     )
 
 with c3:
-    if llm_provider == "ollama":
-        mode = "cached"
-        st.success("⚡ Fast Mode")
+    mode = "cached" if llm_provider == "ollama" else "live"
+    if mode == "cached":
+        st.success("Fast Mode")
     else:
-        mode = "live"
-        st.warning("🤖 Live AI Mode")
+        st.info("Live AI Mode")
 
-generate = st.button("🚀 Generate Academic Report", use_container_width=True)
+generate = st.button("Generate Academic Report", use_container_width=True)
 
 # ============================================================
 # HELPERS
@@ -180,33 +173,44 @@ def score_color(score):
     try:
         score = float(score)
     except Exception:
-        return "amber", "⚪"
+        return "amber"
     if score >= 70:
-        return "green", "🟢"
+        return "green"
     if score >= 50:
-        return "amber", "🟠"
-    return "red", "🔴"
+        return "amber"
+    return "red"
 
-def trend_icon(trend):
+def trend_label(trend):
     t = str(trend).lower()
     if "up" in t:
-        return "⬆️ Improving"
+        return "Improving"
     if "down" in t:
-        return "⬇️ Declining"
-    return "➖ Stable"
+        return "Declining"
+    return "Stable"
 
-def normalize_evidence(value):
+def normalize_next_steps(value):
     if not value:
         return []
+    if isinstance(value, dict):
+        return [f"{k}: {v}" for k, v in value.items()]
     if isinstance(value, list):
         return value
     if isinstance(value, str):
         try:
             parsed = json.loads(value)
-            return parsed if isinstance(parsed, list) else [value]
+            if isinstance(parsed, dict):
+                return [f"{k}: {v}" for k, v in parsed.items()]
+            if isinstance(parsed, list):
+                return parsed
         except Exception:
             return [value]
     return []
+
+SUBJECT_ICONS = {
+    "English": "📘",
+    "Math": "➗",
+    "Science": "🔬",
+}
 
 # ============================================================
 # ACTION
@@ -222,107 +226,125 @@ if generate:
     if mode == "live":
         payload["llm_provider"] = llm_provider
 
-    with st.spinner("Preparing student report..."):
+    with st.spinner("Generating report..."):
         response = requests.post(endpoint, json=payload, timeout=180)
 
     if response.status_code != 200:
-        st.error("Student not found or backend error.")
+        st.error("Backend error or student not found.")
         st.stop()
 
     data = response.json()
 
     # ========================================================
-    # STUDENT HEADER
+    # HEADER
     # ========================================================
 
-    name = data.get("student_name", "")
-    grade = data.get("grade", "")
-
-    if name:
-        st.markdown(
-            f"""
-            <div style="text-align:center; margin:3.5rem 0;">
-                <h1 style="font-size:3.2rem; font-weight:900;">{name.upper()}</h1>
-                <p style="color:#94a3b8;">Grade {grade}</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(
-            '<div class="student-summary-title">Student Academic Summary</div>',
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        f"""
+        <div style="text-align:center; margin:2.2rem 0;">
+            <h1 style="font-size:2.7rem; font-weight:800;">{data.get("student_name","").upper()}</h1>
+            <p>Grade {data.get("grade","")}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # ========================================================
     # OVERVIEW
     # ========================================================
 
-    if data.get("overall_summary"):
-        st.markdown(
-            f"""
-            <div class="section-card">
-                <div class="section-title">📘 Academic Overview</div>
-                <p>{data['overall_summary']}</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        f"""
+        <div class="card">
+            <div class="section-title">Academic Overview</div>
+            <p>{data.get("overall_summary","")}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # ========================================================
-    # PERFORMANCE
+    # PERFORMANCE SNAPSHOT
     # ========================================================
 
-    numeric = data.get("numerical_performance", [])
-    if numeric:
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">📊 Performance at a Glance</div>', unsafe_allow_html=True)
-
-        cols = st.columns(len(numeric))
-        for col, row in zip(cols, numeric):
+    metrics = data.get("numerical_performance", [])
+    if metrics:
+        st.markdown('<div class="card"><div class="section-title">Performance Snapshot</div>', unsafe_allow_html=True)
+        cols = st.columns(len(metrics))
+        for col, row in zip(cols, metrics):
             with col:
-                color, dot = score_color(row.get("latest_score", 0))
+                color = score_color(row.get("latest_score"))
                 st.markdown(
                     f"""
-                    <div class="score-card {color}">
-                        <div class="score-title">{dot} {row['subject']}</div>
-                        <div class="score-value">{row['latest_score']}</div>
-                        <div class="score-meta">
+                    <div class="metric-card {color}">
+                        <div class="metric-title">{row['subject']}</div>
+                        <div class="metric-value">{row['latest_score']}</div>
+                        <div class="metric-meta">
                             Avg: {row['average_score']}<br/>
-                            {trend_icon(row.get('trend'))}<br/>
-                            Risk: {row['risk_flag']}
+                            Trend: {trend_label(row.get("trend"))}<br/>
+                            Risk: {row.get("risk_flag")}
                         </div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
-
         st.markdown("</div>", unsafe_allow_html=True)
 
     # ========================================================
-    # SUBJECT INSIGHTS
+    # SUBJECT INSIGHTS + EVIDENCE
     # ========================================================
 
-    subject_icons = {"English": "📘", "Math": "➗", "Science": "🔬"}
-    subjects = data.get("subject_summaries", [])
+    st.markdown('<div class="card"><div class="section-title">Subject Insights & Evidence</div>', unsafe_allow_html=True)
 
-    if subjects:
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">📚 Subject Insights & Guidance</div>', unsafe_allow_html=True)
+    for subj in data.get("subject_summaries", []):
+        icon = SUBJECT_ICONS.get(subj.get("subject"), "📚")
+        explain = subj.get("explainability", {}) or {}
 
-        for subj in subjects:
-            icon = subject_icons.get(subj["subject"], "📖")
-            with st.expander(f"{icon} {subj['subject']}"):
-                st.write(subj.get("performance_summary",""))
-                st.write(subj.get("improvement_plan",""))
-                st.write(subj.get("motivation_note",""))
+        evidence = explain.get("key_evidence_points", [])
+        if isinstance(evidence, str):
+            evidence = [e for e in evidence.split("\n") if e.strip()]
 
+        with st.expander(f"{icon} {subj.get('subject')}"):
+            st.markdown("**Performance Summary**")
+            st.write(subj.get("performance_summary", "—"))
+
+            st.markdown("**Improvement Plan**")
+            st.write(subj.get("improvement_plan", "—"))
+
+            st.markdown("**Motivation Note**")
+            st.write(subj.get("motivation_note", "—"))
+
+            st.markdown("**Why This Conclusion Was Reached**")
+            st.markdown(
+                f"""
+                <div style="
+                    background:#f8f9fa;
+                    padding:0.9rem;
+                    border-radius:10px;
+                    border-left:4px solid #1a73e8;
+                ">
+                <b>Insight:</b> {explain.get("explanation_summary","—")}<br/><br/>
+                <b>Evidence:</b>
+                <ul>
+                {''.join(f'<li>{e}</li>' for e in evidence)}
+                </ul>
+                <b>Confidence:</b> {explain.get("confidence_in_insight","unknown").capitalize()}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # ========================================================
+    # RECOMMENDED NEXT STEPS
+    # ========================================================
+
+    steps = normalize_next_steps(data.get("recommended_next_steps"))
+    if steps:
+        st.markdown('<div class="card"><div class="section-title">Recommended Next Steps</div>', unsafe_allow_html=True)
+        for step in steps:
+            st.markdown(f"- {step}")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # ========================================================
-    # FOOTER
-    # ========================================================
-
-    st.caption(
-        f"Mode: {data.get('mode', mode)} | Engine: {data.get('llm_provider_used','pipeline')}"
-    )
+    st.caption(f"Mode: {data.get('mode')} | Engine: {data.get('llm_provider_used')}")

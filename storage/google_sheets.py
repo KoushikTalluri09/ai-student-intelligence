@@ -240,15 +240,27 @@ def get_subject_analytics(student_id: str) -> list:
     return _filter_by_student("subject_analytics", student_id).to_dict("records")
 
 
+def list_worksheet_titles() -> list:
+    """Return the .title of every worksheet in the spreadsheet. Used for debugging tab names."""
+    creds = get_credentials()
+    client = gspread.authorize(creds)
+    sheet = client.open_by_key(get_sheet_id())
+    return [ws.title for ws in sheet.worksheets()]
+
+
 def get_student_report_direct(student_id: str) -> dict:
     """Read pre-computed student data directly from Google Sheets, bypassing any API server.
 
     Returns a dict with keys: consolidated, summaries, insights, analytics.
     Each value is a list of row dicts filtered to the given student_id.
-    Empty list means that tab had no rows for this student (or the tab doesn't exist).
+    Only gspread.WorksheetNotFound is silenced (tab absent → empty list).
+    All other errors (auth failure, bad sheet ID, API 4xx/5xx) propagate so
+    the caller can surface the real exception type instead of hiding it.
     """
     creds = get_credentials()
     client = gspread.authorize(creds)
+    # Deliberately NOT in try/except — a 404 here means the spreadsheet itself
+    # is inaccessible (wrong ID or missing share permission). Let it propagate.
     sheet = client.open_by_key(get_sheet_id())
 
     tabs = {
@@ -269,8 +281,10 @@ def get_student_report_direct(student_id: str) -> dict:
                    str(student_id).strip().upper()
             ]
             result[key] = filtered
-        except Exception:
+        except gspread.exceptions.WorksheetNotFound:
+            # Tab simply doesn't exist yet — treat as empty, not an error
             result[key] = []
+        # All other exceptions (APIError, network, etc.) propagate to the caller
 
     return result
 

@@ -24,6 +24,7 @@ from storage.google_sheets import (
     write_table,
     update_user_student_id,
     get_student_report_direct,
+    list_worksheet_titles,
 )
 
 # ============================================================
@@ -1258,12 +1259,24 @@ def show_dashboard():
         _has_gcp = "gcp_service_account" in st.secrets
     except Exception:
         _has_gcp = False
+    try:
+        _sheet_id = st.secrets.get("GOOGLE_SHEETS_ID", os.environ.get("GOOGLE_SHEETS_ID", "NOT SET"))
+    except Exception:
+        _sheet_id = os.environ.get("GOOGLE_SHEETS_ID", "NOT SET")
+    try:
+        _ws_titles = list_worksheet_titles()
+    except Exception as _ws_err:
+        _ws_titles = f"ERROR: {type(_ws_err).__name__}: {_ws_err}"
     st.warning("⚠️ DEBUG INFO (temporary — remove before prod)")
-    st.code(f"""IS_CLOUD                      = {IS_CLOUD}
-has gcp_service_account secret = {_has_gcp}
-DEPLOYMENT env                 = {os.environ.get("DEPLOYMENT")}
-API_BASE                       = {API_BASE}
-get_student_report_direct exists = {"get_student_report_direct" in dir(_gs_module)}""")
+    st.code(f"""IS_CLOUD                        = {IS_CLOUD}
+has gcp_service_account secret  = {_has_gcp}
+DEPLOYMENT env                  = {os.environ.get("DEPLOYMENT")}
+API_BASE                        = {API_BASE}
+GOOGLE_SHEETS_ID                = {_sheet_id}
+get_student_report_direct exists= {"get_student_report_direct" in dir(_gs_module)}
+list_worksheet_titles exists    = {"list_worksheet_titles" in dir(_gs_module)}
+--- actual worksheet tabs in sheet ---
+{_ws_titles}""")
     # ── END DEBUG PANEL ──────────────────────────────────────
 
     # ── Pipeline job polling ─────────────────────────────────
@@ -1524,7 +1537,9 @@ get_student_report_direct exists = {"get_student_report_direct" in dir(_gs_modul
         # ── END DEBUG ────────────────────────────────────────────
 
         if IS_CLOUD:
-            # ── Cloud: read directly from Google Sheets, no API call ─────
+            # ── Cloud: read directly from Google Sheets, ZERO HTTP calls ─
+            # This branch MUST NOT reach any requests.get/post. If an error
+            # escapes here it is a gspread/auth error, not a Render API 404.
             with st.spinner("Loading student data…"):
                 try:
                     _sid_clean = student_id.strip()
@@ -1597,7 +1612,16 @@ get_student_report_direct exists = {"get_student_report_direct" in dir(_gs_modul
                         "llm_provider_used":      _normalize_val(_cons.get("llm_provider", "ollama")),
                     }
                 except Exception as _e:
-                    st.error(f"Could not load student data: {_e}")
+                    # Show the REAL Python exception type so we can distinguish
+                    # gspread.exceptions.APIError (auth/sheet access) from
+                    # gspread.exceptions.WorksheetNotFound (missing tab) from
+                    # anything else — the str() of APIError looks like a
+                    # requests Response but it is NOT a direct HTTP call here.
+                    import traceback as _tb
+                    st.error(
+                        f"Sheets read failed: {type(_e).__name__}: {_e}"
+                    )
+                    st.code(_tb.format_exc(), language="text")
                     st.stop()
 
         elif fast_mode:

@@ -9,3 +9,10 @@ gspread
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
+streamlit
+pyyaml
+ollama
+openai
+anthropic
+google-generativeai
+plotly

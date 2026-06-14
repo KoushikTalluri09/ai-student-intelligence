@@ -4,13 +4,39 @@ import os
 import json
 import base64
 import tempfile
+import time
+import functools
 import pandas as pd
 import numpy as np
 import gspread
 from google.oauth2.service_account import Credentials
 from typing import List
 
-from config.app_config import GOOGLE_SHEETS_DB_NAME
+
+def _with_backoff(fn, *args, max_retries=5, **kwargs):
+    """Retry fn(*args, **kwargs) with exponential backoff on Google 429 errors and transient network resets."""
+    import requests as _requests
+    delay = 10
+    for attempt in range(max_retries):
+        try:
+            return fn(*args, **kwargs)
+        except gspread.exceptions.APIError as e:
+            if attempt == max_retries - 1:
+                raise
+            status = getattr(e.response, "status_code", None)
+            if status != 429:
+                raise
+            print(f"[google_sheets] 429 rate-limit hit, retrying in {delay}s...")
+            time.sleep(delay)
+            delay = min(delay * 2, 120)
+        except (_requests.exceptions.ConnectionError, ConnectionResetError, OSError) as e:
+            if attempt == max_retries - 1:
+                raise
+            print(f"[google_sheets] Network error ({type(e).__name__}), retrying in {delay}s...")
+            time.sleep(delay)
+            delay = min(delay * 2, 120)
+
+from config.app_config import GOOGLE_SHEETS_DB_NAME, GOOGLE_SHEETS_CREDENTIALS as _DEFAULT_CRED_PATH
 
 # =====================================================
 # CREDENTIAL LOADER (RENDER + LOCAL SAFE)
@@ -35,9 +61,13 @@ def _load_credentials_file() -> str:
     if path and os.path.exists(path):
         return path
 
+    if os.path.exists(_DEFAULT_CRED_PATH):
+        return _DEFAULT_CRED_PATH
+
     raise RuntimeError(
         "Google Sheets credentials not found. "
-        "Set GOOGLE_CREDENTIALS_BASE64 (Render) or GOOGLE_SHEETS_CREDENTIALS (local)."
+        "Set GOOGLE_CREDENTIALS_BASE64 (Render) or GOOGLE_SHEETS_CREDENTIALS (local path), "
+        f"or place the service account JSON at '{_DEFAULT_CRED_PATH}'."
     )
 
 # =====================================================
@@ -58,7 +88,7 @@ def get_gs_client() -> gspread.Client:
     return gspread.authorize(credentials)
 
 def get_spreadsheet(client: gspread.Client) -> gspread.Spreadsheet:
-    return client.open(GOOGLE_SHEETS_DB_NAME)
+    return _with_backoff(client.open, GOOGLE_SHEETS_DB_NAME)
 
 # =====================================================
 # SANITIZER
@@ -76,8 +106,8 @@ def _sanitize_df(df: pd.DataFrame) -> pd.DataFrame:
 # =====================================================
 
 def read_table(spreadsheet: gspread.Spreadsheet, table_name: str) -> pd.DataFrame:
-    worksheet = spreadsheet.worksheet(table_name)
-    values = worksheet.get_all_values()
+    worksheet = _with_backoff(spreadsheet.worksheet, table_name)
+    values = _with_backoff(worksheet.get_all_values)
 
     if not values or len(values) < 2:
         return pd.DataFrame()
@@ -94,16 +124,17 @@ def write_table(spreadsheet, table_name: str, df: pd.DataFrame):
     df = _sanitize_df(df)
 
     try:
-        ws = spreadsheet.worksheet(table_name)
-        ws.clear()
+        ws = _with_backoff(spreadsheet.worksheet, table_name)
+        _with_backoff(ws.clear)
     except gspread.WorksheetNotFound:
-        ws = spreadsheet.add_worksheet(
+        ws = _with_backoff(
+            spreadsheet.add_worksheet,
             title=table_name,
             rows=str(max(len(df) + 10, 100)),
             cols=str(len(df.columns) + 5),
         )
 
-    ws.update([df.columns.tolist()] + df.values.tolist())
+    _with_backoff(ws.update, [df.columns.tolist()] + df.values.tolist())
 
 def append_table(spreadsheet, table_name: str, df: pd.DataFrame):
     if df is None or df.empty:
@@ -112,10 +143,11 @@ def append_table(spreadsheet, table_name: str, df: pd.DataFrame):
     df = _sanitize_df(df)
 
     try:
-        ws = spreadsheet.worksheet(table_name)
-        values = ws.get_all_values()
+        ws = _with_backoff(spreadsheet.worksheet, table_name)
+        values = _with_backoff(ws.get_all_values)
     except gspread.WorksheetNotFound:
-        ws = spreadsheet.add_worksheet(
+        ws = _with_backoff(
+            spreadsheet.add_worksheet,
             title=table_name,
             rows=str(max(len(df) + 10, 100)),
             cols=str(len(df.columns) + 5),
@@ -123,10 +155,27 @@ def append_table(spreadsheet, table_name: str, df: pd.DataFrame):
         values = []
 
     if not values or values[0] != df.columns.tolist():
-        ws.clear()
-        ws.update([df.columns.tolist()] + df.values.tolist())
+        _with_backoff(ws.clear)
+        _with_backoff(ws.update, [df.columns.tolist()] + df.values.tolist())
     else:
-        ws.append_rows(df.values.tolist(), value_input_option="USER_ENTERED")
+        _with_backoff(ws.append_rows, df.values.tolist(), value_input_option="USER_ENTERED")
+
+def update_user_student_id(spreadsheet, email: str, student_id: str):
+    """Set student_id for a user row identified by email, adding the column if missing."""
+    df = read_table(spreadsheet, "users")
+    if df.empty or "email" not in df.columns:
+        return
+    if "student_id" not in df.columns:
+        cols = list(df.columns)
+        insert_at = cols.index("role") + 1 if "role" in cols else len(cols)
+        cols.insert(insert_at, "student_id")
+        df = df.reindex(columns=cols, fill_value="")
+    mask = df["email"].str.lower().str.strip() == email.strip().lower()
+    if not mask.any():
+        return
+    df.loc[mask, "student_id"] = student_id
+    write_table(spreadsheet, "users", df)
+
 
 def upsert_table(spreadsheet, table_name: str, df: pd.DataFrame, key_columns: List[str]):
     df = _sanitize_df(df)
@@ -145,4 +194,3 @@ def upsert_table(spreadsheet, table_name: str, df: pd.DataFrame, key_columns: Li
     )
     final_df = pd.concat([existing[mask], df], ignore_index=True)
     write_table(spreadsheet, table_name, final_df)
-print("ENV VAR PRESENT:", bool(os.getenv("GOOGLE_CREDENTIALS_BASE64")))

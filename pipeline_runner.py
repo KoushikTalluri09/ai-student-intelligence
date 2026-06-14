@@ -24,6 +24,7 @@ Example:
 from datetime import datetime, timezone
 import sys
 import os
+import time
 import traceback
 
 # ============================================================
@@ -79,7 +80,7 @@ def run_full_pipeline(llm_provider: str, llm_row_limit: int):
         # PHASE 0 — VALIDATION
         # ====================================================
 
-        log("PHASE 0 | Validating raw_student_scores → validated_results")
+        log("PHASE 0 | Validating raw_student_scores -> validated_results")
         run_validation()
         log("PHASE 0 | SUCCESS")
 
@@ -118,16 +119,30 @@ def run_full_pipeline(llm_provider: str, llm_row_limit: int):
         spreadsheet = get_spreadsheet(client)
 
         analytics_df = read_table(spreadsheet, "subject_analytics")
+        summaries_df = read_table(spreadsheet, "subject_summaries")
 
         if analytics_df.empty:
             raise RuntimeError("subject_analytics sheet is empty")
 
-        student_ids = sorted(analytics_df["student_id"].unique())
+        # Only consolidate students who have BOTH analytics and LLM summaries.
+        # Skipping the rest avoids one Google Sheets connection set per missing student.
+        analytics_ids = set(analytics_df["student_id"].astype(str).str.strip().unique())
+        summary_ids = (
+            set(summaries_df["student_id"].astype(str).str.strip().unique())
+            if not summaries_df.empty
+            else set()
+        )
+        student_ids = sorted(analytics_ids & summary_ids)
 
+        log(f"PHASE 4 | Students with summaries ready: {len(student_ids)}")
+
+        consolidated = 0
         for sid in student_ids:
             run_student_consolidation(sid)
+            consolidated += 1
+            time.sleep(2)  # respect Google Sheets read-quota between students
 
-        log(f"PHASE 4 | SUCCESS | Students consolidated: {len(student_ids)}")
+        log(f"PHASE 4 | SUCCESS | Students consolidated: {consolidated}")
 
         # ====================================================
         # PIPELINE COMPLETE
@@ -140,6 +155,18 @@ def run_full_pipeline(llm_provider: str, llm_row_limit: int):
         log(str(e))
         traceback.print_exc()
         sys.exit(1)
+
+# ============================================================
+# PER-STUDENT ENTRY POINT
+# ============================================================
+
+def run_pipeline_for_student(student_id: str, llm_provider: str = "ollama"):
+    """
+    Trigger the full pipeline so that a specific student gets processed.
+    All phases are incremental and will pick up the new student automatically.
+    """
+    log(f"Triggering full pipeline for student {student_id}")
+    run_full_pipeline(llm_provider, 999)
 
 # ============================================================
 # CLI ENTRY

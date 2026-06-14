@@ -1,0 +1,14 @@
+# Performance thresholds (used by analytics and insight engine)
+performance:
+  low_score_cutoff: 60
+  high_score_cutoff: 80
+
+trend:
+  significant_delta: 5
+
+volatility:
+  low_std_cutoff: 5
+  medium_std_cutoff: 10
+
+mock_vs_real:
+  significant_gap: -5

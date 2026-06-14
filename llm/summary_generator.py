@@ -21,8 +21,6 @@ from storage.google_sheets import (
 
 load_dotenv()
 
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
-
 MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 3
 
@@ -158,17 +156,18 @@ def call_deepseek(prompt: str) -> str:
     return r.choices[0].message.content
 
 def call_llm(prompt: str) -> str:
-    if LLM_PROVIDER == "ollama":
+    provider = os.getenv("LLM_PROVIDER", "ollama").lower()
+    if provider == "ollama":
         return call_ollama(prompt)
-    if LLM_PROVIDER == "openai":
+    if provider == "openai":
         return call_openai(prompt)
-    if LLM_PROVIDER == "claude":
+    if provider == "claude":
         return call_claude(prompt)
-    if LLM_PROVIDER == "gemini":
+    if provider == "gemini":
         return call_gemini(prompt)
-    if LLM_PROVIDER == "deepseek":
+    if provider == "deepseek":
         return call_deepseek(prompt)
-    raise ValueError(f"Unsupported LLM_PROVIDER: {LLM_PROVIDER}")
+    raise ValueError(f"Unsupported LLM_PROVIDER: {provider}")
 
 # ============================================================
 # SUMMARY GENERATION
@@ -178,10 +177,13 @@ def generate_summary(row: Dict) -> Dict:
     prompt = build_prompt(row)
 
     for _ in range(MAX_RETRIES):
-        raw = call_llm(prompt)
-        parsed = safe_json_parse(raw)
-        if parsed:
-            return parsed
+        try:
+            raw = call_llm(prompt)
+            parsed = safe_json_parse(raw)
+            if parsed:
+                return parsed
+        except Exception as exc:
+            print(f"LLM call failed ({type(exc).__name__}: {exc}), retrying...")
         time.sleep(RETRY_DELAY_SECONDS)
 
     return {
@@ -206,11 +208,14 @@ def generate_summary(row: Dict) -> Dict:
 # ============================================================
 
 def run_llm():
+    provider = os.getenv("LLM_PROVIDER", "ollama").lower()
+
     client = get_gs_client()
     spreadsheet = get_spreadsheet(client)
 
     df = read_table(spreadsheet, "subject_insights")
-    df=df.head(20)
+    row_limit = int(os.getenv("LLM_ROW_LIMIT", 9999))
+    df = df.head(row_limit)
 
     if df.empty:
         raise RuntimeError("subject_insights sheet is empty")
@@ -228,7 +233,7 @@ def run_llm():
             "improvement_plan": summary["improvement_plan"],
             "motivation_note": summary["motivation_note"],
             "confidence_note": summary["confidence_note"],
-            "llm_provider": LLM_PROVIDER,
+            "llm_provider": provider,
         })
 
     output_df = pd.DataFrame(summaries)
@@ -245,7 +250,7 @@ def run_llm():
 
     print(
         f"Phase 3 complete | "
-        f"LLM provider: {LLM_PROVIDER} | "
+        f"LLM provider: {os.getenv('LLM_PROVIDER', 'ollama')} | "
         f"Summaries generated: {len(output_df)}"
     )
 

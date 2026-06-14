@@ -4,6 +4,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import os
 import json
+import threading
+import uuid as _uuid
 import pandas as pd
 from typing import Any
 
@@ -25,6 +27,9 @@ app = FastAPI(
     version="2.5.1",
 )
 
+# In-memory pipeline job registry
+_pipeline_jobs: dict = {}
+
 # =====================================================
 # REQUEST SCHEMAS
 # =====================================================
@@ -35,6 +40,11 @@ class StudentSummaryRequest(BaseModel):
 
 class LiveStudentSummaryRequest(BaseModel):
     student_id: str
+    llm_provider: str = "ollama"
+
+
+class PipelineRunRequest(BaseModel):
+    student_id: str = ""
     llm_provider: str = "ollama"
 
 # =====================================================
@@ -99,9 +109,14 @@ def get_student_metadata(validated: pd.DataFrame, student_id: str):
         return {"student_name": "", "grade": ""}
 
     r = row.iloc[0]
+    grade_raw = r.get("grade")
+    try:
+        grade_val = int(grade_raw)
+    except (TypeError, ValueError):
+        grade_val = ""
     return {
         "student_name": normalize(r.get("Name", "")),
-        "grade": int(r.get("grade")),
+        "grade": grade_val,
     }
 
 # =====================================================
@@ -134,9 +149,10 @@ def load_cached(student_id: str):
 
     explain_map = {
         r["subject"]: {
-            "explanation_summary": normalize(r.get("explanation_summary")),
-            "key_evidence_points": normalize(r.get("key_evidence_points")) or [],
+            "explanation_summary":   normalize(r.get("explanation_summary")),
+            "key_evidence_points":   normalize(r.get("key_evidence_points")) or [],
             "confidence_in_insight": normalize(r.get("confidence_in_insight")),
+            "recommended_focus_area": normalize(r.get("recommended_focus_area")),
         }
         for r in df_to_records(i)
     }
@@ -211,6 +227,61 @@ def get_live_summary(req: LiveStudentSummaryRequest):
         "mode": "live",
         "llm_provider_used": req.llm_provider,
     }
+
+@app.get("/student/exists/{student_id}")
+def check_student_exists(student_id: str):
+    """Check whether a student exists in validated_results and/or subject_analytics."""
+    try:
+        client = get_gs_client()
+        sheet = get_spreadsheet(client)
+        validated = normalize_student_id(read_table(sheet, "validated_results"))
+        analytics = normalize_student_id(read_table(sheet, "subject_analytics"))
+        sid = student_id.strip()
+        in_validated = (
+            not validated.empty
+            and "student_id" in validated.columns
+            and sid in validated["student_id"].values
+        )
+        in_analytics = (
+            not analytics.empty
+            and "student_id" in analytics.columns
+            and sid in analytics["student_id"].values
+        )
+        return {
+            "student_id": sid,
+            "in_validated_results": in_validated,
+            "in_subject_analytics": in_analytics,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/pipeline/run")
+def start_pipeline(req: PipelineRunRequest):
+    """Start a full pipeline run in the background. Returns a job_id for status polling."""
+    job_id = str(_uuid.uuid4())
+    _pipeline_jobs[job_id] = {"status": "running", "error": ""}
+
+    def _worker():
+        try:
+            from pipeline_runner import run_full_pipeline
+            run_full_pipeline(req.llm_provider or "ollama", 999)
+            _pipeline_jobs[job_id]["status"] = "done"
+        except Exception as exc:
+            _pipeline_jobs[job_id]["status"] = "failed"
+            _pipeline_jobs[job_id]["error"] = str(exc)
+
+    threading.Thread(target=_worker, daemon=True).start()
+    return {"job_id": job_id, "status": "running"}
+
+
+@app.get("/pipeline/status/{job_id}")
+def get_pipeline_status(job_id: str):
+    """Poll the status of a pipeline job."""
+    if job_id not in _pipeline_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return _pipeline_jobs[job_id]
+
 
 @app.get("/debug/env")
 def debug_env():

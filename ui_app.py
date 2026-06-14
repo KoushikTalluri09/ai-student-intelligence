@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import os
 import streamlit as st
 import requests
 import json
@@ -23,6 +24,17 @@ from storage.google_sheets import (
     write_table,
     update_user_student_id,
 )
+
+# ============================================================
+# CLOUD DETECTION
+# Streamlit Cloud injects st.secrets; DEPLOYMENT=cloud is also
+# set explicitly so os.getenv() works everywhere in the app.
+# IS_CLOUD is True on Streamlit Cloud and also locally when
+# a .streamlit/secrets.toml file is present — both paths use
+# the direct Google Sheets data loader instead of FastAPI.
+# ============================================================
+
+IS_CLOUD = os.environ.get("DEPLOYMENT") == "cloud" or hasattr(st, "secrets")
 
 # ============================================================
 # CONSTANTS
@@ -1062,6 +1074,131 @@ with st.sidebar:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================
+# CLOUD: DIRECT GOOGLE SHEETS DATA LOADER
+# Replicates the Render /student-summary endpoint locally so
+# the app works on Streamlit Cloud without a FastAPI server.
+# ============================================================
+
+def _normalize_val(value):
+    """Normalize a raw Google Sheets cell value for UI display."""
+    if value is None:
+        return ""
+    try:
+        if isinstance(value, float) and pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if isinstance(value, (list, dict)):
+        return value
+    if isinstance(value, str):
+        v = value.strip()
+        try:
+            return json.loads(v)
+        except Exception:
+            return v
+    return value
+
+
+def _df_to_records(df: pd.DataFrame) -> list:
+    """Convert a DataFrame to a normalized list-of-dicts for the UI."""
+    if df is None or df.empty:
+        return []
+    records = json.loads(df.to_json(orient="records"))
+    return [{k: _normalize_val(v) for k, v in row.items()} for row in records]
+
+
+def _load_cached_direct(student_id: str) -> dict:
+    """
+    Read pre-computed student data from Google Sheets directly.
+
+    Raises:
+        LookupError("NOT_FOUND:True")  – student in raw data but not yet processed
+        LookupError("NOT_FOUND:False") – student not in system at all
+        ValueError("NO_DATA")          – no pipeline data exists yet
+    """
+    client = get_gs_client()
+    sheet  = get_spreadsheet(client)
+    sid    = student_id.strip()
+
+    def _safe_read(name: str) -> pd.DataFrame:
+        try:
+            df = read_table(sheet, name)
+            if not df.empty and "student_id" in df.columns:
+                df = df.copy()
+                df["student_id"] = df["student_id"].astype(str).str.strip()
+            return df
+        except Exception:
+            return pd.DataFrame()
+
+    analytics    = _safe_read("subject_analytics")
+    summaries    = _safe_read("subject_summaries")
+    insights_df  = _safe_read("subject_insights")
+    consolidated = _safe_read("student_consolidated_latest")
+    validated    = _safe_read("validated_results")
+
+    if analytics.empty or summaries.empty:
+        raise ValueError("NO_DATA")
+
+    a = analytics[analytics["student_id"] == sid]
+    s = summaries[summaries["student_id"] == sid]
+    i = insights_df[insights_df["student_id"] == sid] if not insights_df.empty else pd.DataFrame()
+    c = consolidated[consolidated["student_id"] == sid] if not consolidated.empty else pd.DataFrame()
+
+    if a.empty or s.empty or c.empty:
+        in_raw = (
+            not validated.empty
+            and "student_id" in validated.columns
+            and sid in validated["student_id"].values
+        )
+        raise LookupError(f"NOT_FOUND:{in_raw}")
+
+    # Student metadata
+    student_name: str   = ""
+    grade:        object = ""
+    if not validated.empty and "student_id" in validated.columns:
+        v_row = validated[validated["student_id"] == sid]
+        if not v_row.empty:
+            r = v_row.iloc[0]
+            student_name = _normalize_val(r.get("Name", ""))
+            try:
+                grade = int(r.get("grade", ""))
+            except Exception:
+                grade = str(r.get("grade", ""))
+
+    cons_row = c.iloc[0]
+
+    # Build per-subject explainability map
+    explain_map: dict = {}
+    for rec in _df_to_records(i):
+        explain_map[rec.get("subject", "")] = {
+            "explanation_summary":    _normalize_val(rec.get("explanation_summary")),
+            "key_evidence_points":    _normalize_val(rec.get("key_evidence_points")) or [],
+            "confidence_in_insight":  _normalize_val(rec.get("confidence_in_insight")),
+            "recommended_focus_area": _normalize_val(rec.get("recommended_focus_area")),
+        }
+
+    subject_summaries_list = [
+        {**subj, "explainability": explain_map.get(subj.get("subject", ""), {})}
+        for subj in _df_to_records(s)
+    ]
+
+    perf_cols = [col for col in ["subject", "average_score", "latest_score", "trend", "risk_flag"]
+                 if col in a.columns]
+    perf_df   = a[perf_cols].sort_values("subject") if "subject" in perf_cols else a[perf_cols]
+
+    return {
+        "student_id":             sid,
+        "student_name":           student_name,
+        "grade":                  grade,
+        "overall_summary":        _normalize_val(cons_row.get("overall_summary")),
+        "recommended_next_steps": _normalize_val(cons_row.get("recommended_next_steps")),
+        "numerical_performance":  _df_to_records(perf_df),
+        "subject_summaries":      subject_summaries_list,
+        "mode":                   "cached",
+        "llm_provider_used":      _normalize_val(cons_row.get("llm_provider", "ollama")),
+    }
+
+# ============================================================
 # HELPERS
 # ============================================================
 
@@ -1114,6 +1251,11 @@ def show_dashboard():
 
     # ── Pipeline job polling ─────────────────────────────────
     _job_id = st.session_state.get("_pipeline_job_id")
+    if _job_id and IS_CLOUD:
+        # Pipeline jobs run on Render; clear any stale state on cloud
+        st.session_state.pop("_pipeline_job_id", None)
+        st.session_state.pop("_pipeline_target_sid", None)
+        _job_id = None
     if _job_id:
         _target_sid = st.session_state.get("_pipeline_target_sid", "")
         try:
@@ -1234,15 +1376,17 @@ def show_dashboard():
                         )
                 st.stop()
 
-            fast_mode = st.toggle("Fast Mode  (local Ollama)", value=True, key="fast_mode")
+            fast_mode = True if IS_CLOUD else st.toggle("Fast Mode  (local Ollama)", value=True, key="fast_mode")
         else:
             r1c1, r1c2 = st.columns([1.1, 0.9])
             with r1c1:
                 student_id = st.text_input("Student ID", placeholder="e.g. S001", label_visibility="visible", key="dashboard_student_id")
             with r1c2:
-                fast_mode = st.toggle("Fast Mode  (local Ollama)", value=True, key="fast_mode")
+                fast_mode = True if IS_CLOUD else st.toggle("Fast Mode  (local Ollama)", value=True, key="fast_mode")
 
-        if not fast_mode:
+        if IS_CLOUD:
+            llm_provider = os.environ.get("LLM_PROVIDER", "ollama")
+        elif not fast_mode:
             ai_col, _ = st.columns([1, 1])
             with ai_col:
                 llm_provider = st.selectbox(
@@ -1270,7 +1414,13 @@ def show_dashboard():
                 pass
         generate = generate or _auto
 
-        if fast_mode:
+        if IS_CLOUD:
+            st.markdown(
+                '<div style="font-size:.7rem;color:#444;margin-top:.4rem;text-align:center;">'
+                'Reading cached reports directly from Google Sheets</div>',
+                unsafe_allow_html=True,
+            )
+        elif fast_mode:
             st.markdown(
                 '<div style="font-size:.7rem;color:#444;margin-top:.4rem;text-align:center;">'
                 'Fast Mode: using local Ollama — instant, no API key required'
@@ -1282,30 +1432,42 @@ def show_dashboard():
     if role in ("Teacher", "Admin"):
         with st.container(border=True):
             st.markdown('<div class="sg-title">Pipeline Controls</div>', unsafe_allow_html=True)
-            _pc1, _pc2 = st.columns([2.5, 1])
-            with _pc1:
+            if IS_CLOUD:
                 st.markdown(
-                    '<p style="font-size:.83rem;color:#777;margin:0;line-height:1.6;">'
-                    'Re-process all students through the analytics pipeline to refresh '
-                    'reports, insights, and summaries.</p>',
+                    f'<div style="background:rgba(41,121,255,.07);border:1px solid rgba(41,121,255,.2);'
+                    f'border-radius:10px;padding:.85rem 1.1rem;font-size:.83rem;color:#888;line-height:1.6;">'
+                    f'{icon("info","#2979ff",14)}&nbsp;'
+                    f'Pipeline processing runs on the <strong style="color:#c0c8d8">Render backend</strong>. '
+                    f'To re-process students, trigger the job from your '
+                    f'<a href="https://dashboard.render.com" target="_blank" style="color:#2979ff;">'
+                    f'Render dashboard</a> or call the API manually.</div>',
                     unsafe_allow_html=True,
                 )
-            with _pc2:
-                if st.button("Run Full Pipeline", key="run_full_pipeline_btn", use_container_width=True):
-                    try:
-                        _fpr = requests.post(
-                            f"{BASE_API}/pipeline/run",
-                            json={"student_id": "", "llm_provider": llm_provider},
-                            timeout=20,
-                        )
-                        if _fpr.ok:
-                            st.session_state["_pipeline_job_id"] = _fpr.json().get("job_id")
-                            st.session_state.pop("_pipeline_target_sid", None)
-                            st.rerun()
-                        else:
-                            st.error(f"Could not start pipeline (HTTP {_fpr.status_code}).")
-                    except Exception as _fpe:
-                        st.error(f"Could not reach pipeline server: {_fpe}")
+            else:
+                _pc1, _pc2 = st.columns([2.5, 1])
+                with _pc1:
+                    st.markdown(
+                        '<p style="font-size:.83rem;color:#777;margin:0;line-height:1.6;">'
+                        'Re-process all students through the analytics pipeline to refresh '
+                        'reports, insights, and summaries.</p>',
+                        unsafe_allow_html=True,
+                    )
+                with _pc2:
+                    if st.button("Run Full Pipeline", key="run_full_pipeline_btn", use_container_width=True):
+                        try:
+                            _fpr = requests.post(
+                                f"{BASE_API}/pipeline/run",
+                                json={"student_id": "", "llm_provider": llm_provider},
+                                timeout=20,
+                            )
+                            if _fpr.ok:
+                                st.session_state["_pipeline_job_id"] = _fpr.json().get("job_id")
+                                st.session_state.pop("_pipeline_target_sid", None)
+                                st.rerun()
+                            else:
+                                st.error(f"Could not start pipeline (HTTP {_fpr.status_code}).")
+                        except Exception as _fpe:
+                            st.error(f"Could not reach pipeline server: {_fpe}")
 
     if generate:
         if not student_id.strip():
@@ -1323,70 +1485,125 @@ def show_dashboard():
         # Top progress bar
         st.markdown('<div class="sg-topbar-progress"></div>', unsafe_allow_html=True)
 
-        endpoint = CACHED_ENDPOINT if fast_mode else LIVE_ENDPOINT
-        payload  = {"student_id": student_id.strip()}
-        if not fast_mode:
-            payload["llm_provider"] = llm_provider
+        if IS_CLOUD or fast_mode:
+            # ── Direct Google Sheets path (cloud + local fast mode) ───────
+            with st.spinner("Loading student data…"):
+                try:
+                    data = _load_cached_direct(student_id.strip())
+                except LookupError as _le:
+                    _sid_clean = student_id.strip()
+                    _in_raw    = str(_le).endswith(":True")
+                    if _in_raw:
+                        st.markdown(f"""
+                        <div style="background:rgba(255,171,64,.09);border:1px solid rgba(255,171,64,.28);
+                                    border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1rem;">
+                          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">
+                            {icon("info","#ffab40",15,2)}
+                            <span style="font-size:.85rem;font-weight:700;color:#ffab40;">Student Found in Raw Data</span>
+                          </div>
+                          <p style="font-size:.83rem;color:#aaa;margin:0 0 .9rem;line-height:1.6;">
+                            <strong style="color:#e0e0e0">{_sid_clean}</strong> exists in the system
+                            but hasn&rsquo;t been processed through the analytics pipeline yet.
+                            {"Run the pipeline from your Render dashboard to generate this student's report." if IS_CLOUD else "Click below to run the pipeline for this student."}
+                          </p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        if not IS_CLOUD:
+                            if st.button(f"Process {_sid_clean} Now", key="process_now_btn"):
+                                try:
+                                    _pr = requests.post(
+                                        f"{BASE_API}/pipeline/run",
+                                        json={"student_id": _sid_clean, "llm_provider": llm_provider},
+                                        timeout=20,
+                                    )
+                                    if _pr.ok:
+                                        st.session_state["_pipeline_job_id"] = _pr.json().get("job_id")
+                                        st.session_state["_pipeline_target_sid"] = _sid_clean
+                                        st.rerun()
+                                    else:
+                                        st.error(f"Could not start pipeline (HTTP {_pr.status_code}).")
+                                except Exception as _pe:
+                                    st.error(f"Could not reach pipeline server: {_pe}")
+                    else:
+                        st.markdown(
+                            f'<div class="auth-error">{icon("alert","#ff3d57",14)}&nbsp;'
+                            f'Student <strong>{_sid_clean}</strong> not found in the system. '
+                            f'Check the student ID and try again.</div>',
+                            unsafe_allow_html=True,
+                        )
+                    st.stop()
+                except ValueError:
+                    st.markdown(
+                        f'<div class="auth-error">{icon("alert","#ff3d57",14)}&nbsp;'
+                        f'No pipeline data found. Run the analytics pipeline first to generate reports.</div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.stop()
+                except Exception as _e:
+                    st.error(f"Could not load student data: {_e}")
+                    st.stop()
+        else:
+            # ── Live mode via Render backend (local only, no fast_mode) ───
+            payload = {"student_id": student_id.strip(), "llm_provider": llm_provider}
+            with st.spinner("Generating live AI summary…"):
+                try:
+                    response = requests.post(LIVE_ENDPOINT, json=payload, timeout=180)
+                except requests.exceptions.ConnectionError:
+                    st.error("Cannot reach the backend. Is pipeline_server.py running?")
+                    st.stop()
 
-        with st.spinner("Analyzing student data…"):
-            try:
-                response = requests.post(endpoint, json=payload, timeout=180)
-            except requests.exceptions.ConnectionError:
-                st.error("Cannot reach the backend. Is pipeline_server.py running?")
+            if response.status_code == 404:
+                _sid_clean = student_id.strip()
+                _in_raw = False
+                try:
+                    _ex = requests.get(f"{BASE_API}/student/exists/{_sid_clean}", timeout=15)
+                    if _ex.ok:
+                        _in_raw = _ex.json().get("in_validated_results", False)
+                except Exception:
+                    pass
+                if _in_raw:
+                    st.markdown(f"""
+                    <div style="background:rgba(255,171,64,.09);border:1px solid rgba(255,171,64,.28);
+                                border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1rem;">
+                      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">
+                        {icon("info","#ffab40",15,2)}
+                        <span style="font-size:.85rem;font-weight:700;color:#ffab40;">Student Found in Raw Data</span>
+                      </div>
+                      <p style="font-size:.83rem;color:#aaa;margin:0 0 .9rem;line-height:1.6;">
+                        <strong style="color:#e0e0e0">{_sid_clean}</strong> exists in the system
+                        but hasn&rsquo;t been processed through the analytics pipeline yet.
+                        Click below to run the pipeline for this student.
+                      </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    if st.button(f"Process {_sid_clean} Now", key="process_now_btn"):
+                        try:
+                            _pr = requests.post(
+                                f"{BASE_API}/pipeline/run",
+                                json={"student_id": _sid_clean, "llm_provider": llm_provider},
+                                timeout=20,
+                            )
+                            if _pr.ok:
+                                st.session_state["_pipeline_job_id"] = _pr.json().get("job_id")
+                                st.session_state["_pipeline_target_sid"] = _sid_clean
+                                st.rerun()
+                            else:
+                                st.error(f"Could not start pipeline (HTTP {_pr.status_code}). Check server logs.")
+                        except Exception as _pe:
+                            st.error(f"Could not reach pipeline server: {_pe}")
+                else:
+                    st.markdown(
+                        f'<div class="auth-error">{icon("alert","#ff3d57",14)}&nbsp;'
+                        f'Student <strong>{_sid_clean}</strong> not found in the system. '
+                        f'Check the student ID and try again.</div>',
+                        unsafe_allow_html=True,
+                    )
+                st.stop()
+            if response.status_code != 200:
+                st.error(f"Backend returned {response.status_code}. Check server logs.")
                 st.stop()
 
-        if response.status_code == 404:
-            _sid_clean = student_id.strip()
-            _in_raw = False
-            try:
-                _ex = requests.get(f"{BASE_API}/student/exists/{_sid_clean}", timeout=15)
-                if _ex.ok:
-                    _in_raw = _ex.json().get("in_validated_results", False)
-            except Exception:
-                pass
-            if _in_raw:
-                st.markdown(f"""
-                <div style="background:rgba(255,171,64,.09);border:1px solid rgba(255,171,64,.28);
-                            border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1rem;">
-                  <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">
-                    {icon("info","#ffab40",15,2)}
-                    <span style="font-size:.85rem;font-weight:700;color:#ffab40;">Student Found in Raw Data</span>
-                  </div>
-                  <p style="font-size:.83rem;color:#aaa;margin:0 0 .9rem;line-height:1.6;">
-                    <strong style="color:#e0e0e0">{_sid_clean}</strong> exists in the system
-                    but hasn&rsquo;t been processed through the analytics pipeline yet.
-                    Click below to run the pipeline for this student.
-                  </p>
-                </div>
-                """, unsafe_allow_html=True)
-                if st.button(f"Process {_sid_clean} Now", key="process_now_btn"):
-                    try:
-                        _pr = requests.post(
-                            f"{BASE_API}/pipeline/run",
-                            json={"student_id": _sid_clean, "llm_provider": llm_provider},
-                            timeout=20,
-                        )
-                        if _pr.ok:
-                            st.session_state["_pipeline_job_id"] = _pr.json().get("job_id")
-                            st.session_state["_pipeline_target_sid"] = _sid_clean
-                            st.rerun()
-                        else:
-                            st.error(f"Could not start pipeline (HTTP {_pr.status_code}). Check server logs.")
-                    except Exception as _pe:
-                        st.error(f"Could not reach pipeline server: {_pe}")
-            else:
-                st.markdown(
-                    f'<div class="auth-error">{icon("alert","#ff3d57",14)}&nbsp;'
-                    f'Student <strong>{_sid_clean}</strong> not found in the system. '
-                    f'Check the student ID and try again.</div>',
-                    unsafe_allow_html=True,
-                )
-            st.stop()
-        if response.status_code != 200:
-            st.error(f"Backend returned {response.status_code}. Check server logs.")
-            st.stop()
-
-        data = response.json()
+            data = response.json()
 
         name          = data.get("student_name", "").upper() or student_id.upper()
         grade         = data.get("grade", "—")

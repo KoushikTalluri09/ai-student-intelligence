@@ -1,9 +1,7 @@
-# -------------------------------------------------
-# GOOGLE SHEETS CONFIGURATION
-# -------------------------------------------------
+import os
 
-# Path to the Google Service Account JSON file
+# Path to the Google Service Account JSON file (local fallback)
 GOOGLE_SHEETS_CREDENTIALS = "config/google_service_account.json"
 
-# Name of the Google Spreadsheet acting as the database
-GOOGLE_SHEETS_DB_NAME = "AI_Student_Intelligence_DB"
+# Spreadsheet name — overridable via env var or st.secrets
+GOOGLE_SHEETS_DB_NAME = os.getenv("GOOGLE_SHEETS_DB_NAME", "AI_Student_Intelligence_DB")

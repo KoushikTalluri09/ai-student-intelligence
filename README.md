@@ -1,288 +1,130 @@
-**🎓 AI Student Intelligence**
+# STEM Globe — AI Student Intelligence Platform
 
-A Production-Grade, Explainable Academic Intelligence Platform
-Faculty-level academic analytics and AI-driven insights built with data validation, explainability, and trust at the core.
+A production-grade, explainable academic intelligence platform that transforms raw exam scores into faculty-level insights, AI-generated summaries, and a polished role-based dashboard — built for students, parents, and teachers.
 
-📌 Table of Contents
+**Live app:** [https://ai-student-intelligence.onrender.com](https://ai-student-intelligence.onrender.com)
 
-- Project Overview
-- Why This Project Exists
-- What Problems This Solves
-- High-Level Architecture
-- End-to-End Pipeline Phases
-- Data Model & Google Sheets as Database
-- Cached vs Live AI Strategy
-- Explainability & Trust Layer
-- Backend API (FastAPI)
-- Frontend UI (Streamlit)
-- LLM Strategy & Prompt Design
-- Error Handling & Production Safeguards
-- Folder Structure Explained
+---
 
+## Screenshot
 
+![Dashboard](docs/screenshot.png)
 
+*(Add your own screenshot to `docs/screenshot.png`)*
 
-**1️-  Project Overview**
+---
 
-AI Student Intelligence is a full-stack academic intelligence system that transforms raw exam scores into:
+## Tech Stack
 
-📊 Clean analytics
-🧠 Explainable academic insights
-✍️ AI-generated faculty-grade summaries
-🎓 Student-level consolidated reports
-🖥️ A polished, interactive UI
+| Layer | Technology |
+|---|---|
+| Frontend | Streamlit |
+| Backend API | FastAPI + Uvicorn (Render) |
+| Database | Google Sheets (gspread) |
+| Analytics | Pandas, NumPy |
+| Charts | Plotly |
+| LLMs | Ollama · OpenAI · Anthropic Claude · Gemini · DeepSeek |
+| Secrets (cloud) | Streamlit Secrets / st.secrets |
+| Secrets (local) | python-dotenv |
 
+---
 
+## How to Run Locally
 
-**2- Why This Project Exists**
+### 1. Clone and install dependencies
 
-Most “AI education projects” fail in real-world settings because:
+```bash
+git clone https://github.com/KoushikTalluri09/ai-student-intelligence.git
+cd ai-student-intelligence
+pip install -r requirements.txt
+```
 
-Raw data is noisy and unvalidated
-AI outputs are not explainable
-Systems overwrite data silently
-There is no trust layer
-UI is disconnected from backend reality
+### 2. Add Google credentials
 
+Place your Google service account JSON at `config/google_service_account.json`.
 
+Create a `.env` file in the project root:
 
-**3️- What Problems This Solves For Students**
+```env
+GOOGLE_SHEETS_CREDENTIALS=config/google_service_account.json
+GOOGLE_SHEETS_DB_NAME=AI_Student_Intelligence_DB
 
-- Understand why performance is good or bad
-- Get actionable improvement plans
-- Avoid black-box AI feedback
+# Optional — only needed for cloud LLM providers
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=your-key
+```
 
-For Teachers
+### 3. (Optional) Start the pipeline server
 
-- Identify at-risk students early
-- Get interpretable signals, not raw scores
-- Decide when intervention is needed
+Required only if you want to run the analytics pipeline locally. The Streamlit app
+can call the hosted Render backend without this step.
 
-For Institutions
+```bash
+uvicorn pipeline_server:app --host 0.0.0.0 --port 8000 --reload
+```
 
-- Standardized academic analytics
-- Audit-friendly data flow
-- Reproducible AI decisions
+### 4. Launch the Streamlit app
 
-**4️- High-Level Architecture**
+```bash
+streamlit run ui_app.py
+```
 
-Raw Exam Data 
-[Phase 0] Validation
-[Phase 1] Subject Analytics
-[Phase 2] Insights + Explainability
-[Phase 3] LLM Subject Summaries
-[Phase 4] Student Consolidation
-FastAPI (Cached + Live)
-Streamlit UI
+Open [http://localhost:8501](http://localhost:8501).
 
+**Demo credentials:**
+| Email | Password | Role |
+|---|---|---|
+| `demo@stemglobe.io` | `demo1234` | Student |
+| `admin@school.com` | `Admin@123` | Admin |
 
-**5️- End-to-End Pipeline Phases**
+---
 
-**🔹 Phase 0 — Data Validation**
+## Project Description
 
-File: analytics/validators.py
-Schema validation
-Score range checks
-Date normalization
-Hard failure on bad data
+AI Student Intelligence is a full-stack academic intelligence system that runs a five-phase pipeline on raw exam data:
 
-Output:
-validated_results
+| Phase | File | Output |
+|---|---|---|
+| 0 — Validation | `analytics/validators.py` | `validated_results` |
+| 1 — Subject Analytics | `analytics/student_analyzer.py` | `subject_analytics` |
+| 2 — Insights + Explainability | `insights/insight_engine.py` | `subject_insights` |
+| 3 — LLM Summaries | `llm/summary_generator.py` | `subject_summaries` |
+| 4 — Student Consolidation | `insights/student_consolidator.py` | `student_consolidated_latest` |
 
-**🔹 Phase 1 — Subject Analytics**
+### Why Google Sheets as the database?
 
-File: analytics/student_analyzer.py
+Transparent, shareable, auditable, and accessible to non-technical stakeholders without a separate database server. All pipeline outputs are written to named worksheets in a single Google Spreadsheet.
 
-Generates per-student, per-subject metrics:
-Average score
-Latest score
-Trend
-Volatility
-Risk flag
-Performance band
-Data confidence
+### Cached vs Live AI
 
-Output:
-subject_analytics
+- **Cached mode (default):** Reads pre-computed AI summaries. Fast, free, deterministic.
+- **Live mode:** Calls the selected LLM (OpenAI, Claude, Gemini, DeepSeek) in real-time.
 
-**🔹 Phase 2 — Insights + Explainability**
+### Explainability layer
 
-File: insights/insight_engine.py
+Every AI output is backed by explicit evidence points, numeric signals, confidence level, and human-readable reasoning — no black-box outputs.
 
-This is the trust layer.
-For each subject:
-Primary academic issue
-Root cause
-Urgency
-Recommended focus
-Teacher intervention signal
-Explainability evidence (human-readable)
+---
 
-Output:
-subject_insights
+## Folder Structure
 
-**🔹 Phase 3 — AI Subject Summaries**
+```
+ui_app.py               # Streamlit frontend (entry point for Streamlit Cloud)
+pipeline_server.py      # FastAPI backend (deployed on Render)
+pipeline_runner.py      # Full pipeline orchestrator
+analytics/              # Phase 0-1: validation, scoring, metrics
+insights/               # Phase 2 & 4: insight engine + student consolidator
+llm/                    # Phase 3: multi-provider LLM summary generation
+storage/                # Google Sheets read/write abstraction
+config/                 # App config + score thresholds
+.streamlit/             # Streamlit server config + secrets (local only)
+requirements.txt
+```
 
-File: llm/summary_generator.py
+---
 
-Generates world-class, readable summaries:
-Performance summary (multi-sentence, natural)
-Improvement plan
-Motivation note
-Confidence level
+## Author
 
-Key rules:
-Deterministic provider selection
-Safe JSON parsing
-No hallucinated data
-Hard fallback if AI fails
-
-Output:
-subject_summaries
-
-**🔹 Phase 4 — Student Consolidation**
-
-File: insights/student_consolidator.py
-
-Creates a single academic narrative per student:
-Cross-subject patterns
-Strengths
-Areas to improve
-Next steps
-Confidence signal
-
-Writes to:
-student_consolidated_latest (upsert)
-student_consolidated_history (audit log)
-
-**6️- Google Sheets as a Database**
-
-**Why Google Sheets?**
-Transparent
-Shareable (view-only)
-Auditable
-Non-technical stakeholder friendly
-
-Sheets used:
-
-- validated_results
-
-- subject_analytics
-
-- subject_insights
-
-- subject_summaries
-
-- student_consolidated_latest
-
-- student_consolidated_history
-
-**7️- Cached vs Live AI Strategy**
-
-**- Cached Mode (Default)**
-
-Uses precomputed summaries
-Fast
-Free
-Deterministic
-Best for demos & classrooms
-
-**- Live Mode**
-
-User selects LLM (OpenAI, Claude, Gemini, etc.)
-Real-time generation
-API-backed
-Fully optional
-UI automatically switches modes based on LLM selection.
-
-**8️- Explainability & Trust Layer**
-
-Every AI output is backed by:
-
-Explicit evidence points
-Numeric signals
-Confidence level
-Human-readable reasoning
-
-
-**9️- Backend API (FastAPI)**
-
-File: pipeline_server.py
-
-Endpoints:
-
-POST /student-summary → cached
-POST /student-summary/live → live AI
-GET / → health check
-
-Features:
-
-JSON-safe parsing
-NaN-proof responses
-Defensive error handling
-Explainability injection
-
-**10- Frontend UI (Streamlit)**
-
-File: ui_app.py
-
-Features:
-Professional UI cards
-Color-coded subject scores
-Trend indicators
-Drill-down subject insights
-Evidence bullets rendered correctly
-Explainability sections
-Responsive layout
-Designed for readability, not flash.
-
-**11- LLM Strategy & Prompt Design**
-
-Strict JSON contracts
-Multi-sentence outputs
-Faculty tone
-No invented numbers
-Retry logic + fallback
-LLMs supported:
-
-Ollama (local)
-OpenAI
-Claude
-Gemini
-DeepSeek
-
-**12- Error Handling & Safeguards**
-
-NaN sanitization everywhere
-Header-safe Google Sheets writes
-Append vs overwrite explicitly controlled
-No silent failures
-Pipeline-safe execution (one student never breaks batch)
-
-**13- Folder Structure**
-
-analytics/   → metrics & analytics
-insights/    → insights & consolidation
-llm/         → AI summaries
-storage/     → Google Sheets abstraction
-config/      → config files
-data/        → sample datasets
-ui_app.py    → Streamlit UI
-pipeline_runner.py
-pipeline_server.py
-
-
--
-
-
-
-**👤 Author**
-
-**Koushik Talluri
-MS Business Analytics — UMass Amherst**
-
-
-Data Analytics | AI Systems 
-
-
-
+**Koushik Talluri** — MS Business Analytics, UMass Amherst  
+Data Analytics · AI Systems

@@ -36,17 +36,34 @@ def _with_backoff(fn, *args, max_retries=5, **kwargs):
             time.sleep(delay)
             delay = min(delay * 2, 120)
 
+def _inject_streamlit_secrets():
+    """
+    On Streamlit Cloud, st.secrets are not automatically env vars.
+    Inject them into os.environ so every module can use os.getenv() as normal.
+    Must run BEFORE importing config (which reads env vars at import time).
+    """
+    try:
+        import streamlit as st
+        for key, val in st.secrets.items():
+            if isinstance(val, str) and key not in os.environ:
+                os.environ[key] = val
+    except Exception:
+        pass
+
+_inject_streamlit_secrets()
+
 from config.app_config import GOOGLE_SHEETS_DB_NAME, GOOGLE_SHEETS_CREDENTIALS as _DEFAULT_CRED_PATH
 
 # =====================================================
-# CREDENTIAL LOADER (RENDER + LOCAL SAFE)
+# CREDENTIAL LOADER (STREAMLIT CLOUD + RENDER + LOCAL)
 # =====================================================
 
 def _load_credentials_file() -> str:
     """
-    Loads Google credentials from:
-    1) GOOGLE_CREDENTIALS_BASE64 (Render / prod)
-    2) GOOGLE_SHEETS_CREDENTIALS (local file path)
+    Loads Google credentials from (in priority order):
+    1) GOOGLE_CREDENTIALS_BASE64 env var (Streamlit Cloud / Render — set via secrets)
+    2) GOOGLE_SHEETS_CREDENTIALS env var (local file path)
+    3) Default local file path from config
     """
     b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
     path = os.getenv("GOOGLE_SHEETS_CREDENTIALS")

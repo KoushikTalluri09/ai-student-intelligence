@@ -40,9 +40,9 @@ IS_CLOUD = os.environ.get("DEPLOYMENT") == "cloud" or hasattr(st, "secrets")
 # CONSTANTS
 # ============================================================
 
-BASE_API        = "https://ai-student-intelligence.onrender.com"
-CACHED_ENDPOINT = f"{BASE_API}/student-summary"
-LIVE_ENDPOINT   = f"{BASE_API}/student-summary/live"
+API_BASE        = "https://ai-student-intelligence.onrender.com" if IS_CLOUD else "http://localhost:8000"
+CACHED_ENDPOINT = f"{API_BASE}/student-summary"
+LIVE_ENDPOINT   = f"{API_BASE}/student-summary/live"
 EMAIL_RE        = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
 ROLES           = ["Teacher", "Parent", "Student", "Admin"]
 
@@ -1259,7 +1259,7 @@ def show_dashboard():
     if _job_id:
         _target_sid = st.session_state.get("_pipeline_target_sid", "")
         try:
-            _poll = requests.get(f"{BASE_API}/pipeline/status/{_job_id}", timeout=10)
+            _poll = requests.get(f"{API_BASE}/pipeline/status/{_job_id}", timeout=10)
             _jstate = _poll.json() if _poll.ok else {"status": "unknown"}
         except Exception:
             _jstate = {"status": "unknown"}
@@ -1456,7 +1456,7 @@ def show_dashboard():
                     if st.button("Run Full Pipeline", key="run_full_pipeline_btn", use_container_width=True):
                         try:
                             _fpr = requests.post(
-                                f"{BASE_API}/pipeline/run",
+                                f"{API_BASE}/pipeline/run",
                                 json={"student_id": "", "llm_provider": llm_provider},
                                 timeout=20,
                             )
@@ -1512,7 +1512,7 @@ def show_dashboard():
                             if st.button(f"Process {_sid_clean} Now", key="process_now_btn"):
                                 try:
                                     _pr = requests.post(
-                                        f"{BASE_API}/pipeline/run",
+                                        f"{API_BASE}/pipeline/run",
                                         json={"student_id": _sid_clean, "llm_provider": llm_provider},
                                         timeout=20,
                                     )
@@ -1556,7 +1556,7 @@ def show_dashboard():
                 _sid_clean = student_id.strip()
                 _in_raw = False
                 try:
-                    _ex = requests.get(f"{BASE_API}/student/exists/{_sid_clean}", timeout=15)
+                    _ex = requests.get(f"{API_BASE}/student/exists/{_sid_clean}", timeout=15)
                     if _ex.ok:
                         _in_raw = _ex.json().get("in_validated_results", False)
                 except Exception:
@@ -1579,7 +1579,7 @@ def show_dashboard():
                     if st.button(f"Process {_sid_clean} Now", key="process_now_btn"):
                         try:
                             _pr = requests.post(
-                                f"{BASE_API}/pipeline/run",
+                                f"{API_BASE}/pipeline/run",
                                 json={"student_id": _sid_clean, "llm_provider": llm_provider},
                                 timeout=20,
                             )
@@ -2432,7 +2432,7 @@ def show_settings():
         rows = [
             ("Platform",  "STEM Globe Intelligence"),
             ("Version",   "2.5.1"),
-            ("API",       "https://ai-student-intelligence.onrender.com"),
+            ("API",       API_BASE),
             ("Theme",     "OLED Dark"),
         ]
         for label, val in rows:

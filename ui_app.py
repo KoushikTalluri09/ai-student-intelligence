@@ -1252,6 +1252,20 @@ def show_dashboard():
     name = st.session_state.user_name or "User"
     is_student = (role == "Student")
 
+    # ── TEMPORARY DEBUG PANEL ────────────────────────────────
+    import storage.google_sheets as _gs_module
+    try:
+        _has_gcp = "gcp_service_account" in st.secrets
+    except Exception:
+        _has_gcp = False
+    st.warning("⚠️ DEBUG INFO (temporary — remove before prod)")
+    st.code(f"""IS_CLOUD                      = {IS_CLOUD}
+has gcp_service_account secret = {_has_gcp}
+DEPLOYMENT env                 = {os.environ.get("DEPLOYMENT")}
+API_BASE                       = {API_BASE}
+get_student_report_direct exists = {"get_student_report_direct" in dir(_gs_module)}""")
+    # ── END DEBUG PANEL ──────────────────────────────────────
+
     # ── Pipeline job polling ─────────────────────────────────
     _job_id = st.session_state.get("_pipeline_job_id")
     if _job_id and IS_CLOUD:
@@ -1498,6 +1512,16 @@ def show_dashboard():
 
         # Top progress bar
         st.markdown('<div class="sg-topbar-progress"></div>', unsafe_allow_html=True)
+
+        # ── DEBUG: show exactly what path/URL will be called ────
+        if IS_CLOUD:
+            _dbg_call = "get_student_report_direct(student_id) — pure Google Sheets, no HTTP"
+        elif fast_mode:
+            _dbg_call = "_load_cached_direct(student_id) — pure Google Sheets, no HTTP"
+        else:
+            _dbg_call = f"POST {LIVE_ENDPOINT}"
+        st.code(f"[DEBUG] Generate clicked for student_id={student_id.strip()!r}\nWill call: {_dbg_call}")
+        # ── END DEBUG ────────────────────────────────────────────
 
         if IS_CLOUD:
             # ── Cloud: read directly from Google Sheets, no API call ─────

@@ -240,6 +240,41 @@ def get_subject_analytics(student_id: str) -> list:
     return _filter_by_student("subject_analytics", student_id).to_dict("records")
 
 
+def get_student_report_direct(student_id: str) -> dict:
+    """Read pre-computed student data directly from Google Sheets, bypassing any API server.
+
+    Returns a dict with keys: consolidated, summaries, insights, analytics.
+    Each value is a list of row dicts filtered to the given student_id.
+    Empty list means that tab had no rows for this student (or the tab doesn't exist).
+    """
+    creds = get_credentials()
+    client = gspread.authorize(creds)
+    sheet = client.open_by_key(get_sheet_id())
+
+    tabs = {
+        "consolidated": "student_consolidated_latest",
+        "summaries":    "subject_summaries",
+        "insights":     "subject_insights",
+        "analytics":    "subject_analytics",
+    }
+
+    result: dict = {}
+    for key, tab_name in tabs.items():
+        try:
+            worksheet = _with_backoff(sheet.worksheet, tab_name)
+            records = _with_backoff(worksheet.get_all_records)
+            filtered = [
+                r for r in records
+                if str(r.get("student_id", "")).strip().upper() ==
+                   str(student_id).strip().upper()
+            ]
+            result[key] = filtered
+        except Exception:
+            result[key] = []
+
+    return result
+
+
 def upsert_table(spreadsheet, table_name: str, df: pd.DataFrame, key_columns: List[str]):
     df = _sanitize_df(df)
 

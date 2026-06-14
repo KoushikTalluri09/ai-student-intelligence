@@ -23,6 +23,7 @@ from storage.google_sheets import (
     append_table,
     write_table,
     update_user_student_id,
+    get_student_report_direct,
 )
 
 # ============================================================
@@ -34,7 +35,9 @@ from storage.google_sheets import (
 # the direct Google Sheets data loader instead of FastAPI.
 # ============================================================
 
-IS_CLOUD = os.environ.get("DEPLOYMENT") == "cloud" or hasattr(st, "secrets")
+IS_CLOUD = os.environ.get("DEPLOYMENT") == "cloud" or (
+    "gcp_service_account" in st.secrets if hasattr(st, "secrets") else False
+)
 
 # ============================================================
 # CONSTANTS
@@ -1496,8 +1499,85 @@ def show_dashboard():
         # Top progress bar
         st.markdown('<div class="sg-topbar-progress"></div>', unsafe_allow_html=True)
 
-        if IS_CLOUD or fast_mode:
-            # ── Direct Google Sheets path (cloud + local fast mode) ───────
+        if IS_CLOUD:
+            # ── Cloud: read directly from Google Sheets, no API call ─────
+            with st.spinner("Loading student data…"):
+                try:
+                    _sid_clean = student_id.strip()
+                    _raw = get_student_report_direct(_sid_clean)
+
+                    # Nothing in any sheet → pipeline has never run
+                    if not _raw["consolidated"] and not _raw["analytics"] and not _raw["summaries"]:
+                        st.markdown(
+                            f'<div class="auth-error">{icon("alert","#ff3d57",14)}&nbsp;'
+                            f'No pipeline data found in Google Sheets. '
+                            f'Run the analytics pipeline from your Render dashboard first.</div>',
+                            unsafe_allow_html=True,
+                        )
+                        st.stop()
+
+                    # This student specifically has no processed data
+                    if not _raw["consolidated"] or not _raw["analytics"] or not _raw["summaries"]:
+                        st.markdown(f"""
+                        <div style="background:rgba(255,171,64,.09);border:1px solid rgba(255,171,64,.28);
+                                    border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1rem;">
+                          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">
+                            {icon("info","#ffab40",15,2)}
+                            <span style="font-size:.85rem;font-weight:700;color:#ffab40;">Student Not Yet Processed</span>
+                          </div>
+                          <p style="font-size:.83rem;color:#aaa;margin:0 0 .9rem;line-height:1.6;">
+                            <strong style="color:#e0e0e0">{_sid_clean}</strong> does not have processed
+                            reports yet. Run the pipeline from your Render dashboard to generate this
+                            student&rsquo;s report.
+                          </p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.stop()
+
+                    _cons = _raw["consolidated"][0]
+
+                    # Build explainability map from subject_insights rows
+                    _explain_map: dict = {}
+                    for _ins in _raw["insights"]:
+                        _explain_map[_ins.get("subject", "")] = {
+                            "explanation_summary":    _normalize_val(_ins.get("explanation_summary")),
+                            "key_evidence_points":    _normalize_val(_ins.get("key_evidence_points")) or [],
+                            "confidence_in_insight":  _normalize_val(_ins.get("confidence_in_insight")),
+                            "recommended_focus_area": _normalize_val(_ins.get("recommended_focus_area")),
+                        }
+
+                    _subj_summaries = [
+                        {**{k: _normalize_val(v) for k, v in _s.items()},
+                         "explainability": _explain_map.get(_s.get("subject", ""), {})}
+                        for _s in _raw["summaries"]
+                    ]
+
+                    data = {
+                        "student_id":             _sid_clean,
+                        "student_name":           _normalize_val(_cons.get("student_name", _cons.get("Name", ""))),
+                        "grade":                  _normalize_val(_cons.get("grade", "")),
+                        "overall_summary":        _normalize_val(_cons.get("overall_summary", "")),
+                        "recommended_next_steps": _normalize_val(_cons.get("recommended_next_steps", "")),
+                        "numerical_performance": [
+                            {
+                                "subject":       _r.get("subject", ""),
+                                "average_score": _r.get("average_score", 0),
+                                "latest_score":  _r.get("latest_score", 0),
+                                "trend":         _r.get("trend", ""),
+                                "risk_flag":     _r.get("risk_flag", "—"),
+                            }
+                            for _r in _raw["analytics"]
+                        ],
+                        "subject_summaries":      _subj_summaries,
+                        "mode":                   "cached",
+                        "llm_provider_used":      _normalize_val(_cons.get("llm_provider", "ollama")),
+                    }
+                except Exception as _e:
+                    st.error(f"Could not load student data: {_e}")
+                    st.stop()
+
+        elif fast_mode:
+            # ── Local fast mode: direct Google Sheets via _load_cached_direct ─
             with st.spinner("Loading student data…"):
                 try:
                     data = _load_cached_direct(student_id.strip())
@@ -1515,26 +1595,25 @@ def show_dashboard():
                           <p style="font-size:.83rem;color:#aaa;margin:0 0 .9rem;line-height:1.6;">
                             <strong style="color:#e0e0e0">{_sid_clean}</strong> exists in the system
                             but hasn&rsquo;t been processed through the analytics pipeline yet.
-                            {"Run the pipeline from your Render dashboard to generate this student's report." if IS_CLOUD else "Click below to run the pipeline for this student."}
+                            Click below to run the pipeline for this student.
                           </p>
                         </div>
                         """, unsafe_allow_html=True)
-                        if not IS_CLOUD:
-                            if st.button(f"Process {_sid_clean} Now", key="process_now_btn"):
-                                try:
-                                    _pr = requests.post(
-                                        f"{API_BASE}/pipeline/run",
-                                        json={"student_id": _sid_clean, "llm_provider": llm_provider},
-                                        timeout=20,
-                                    )
-                                    if _pr.ok:
-                                        st.session_state["_pipeline_job_id"] = _pr.json().get("job_id")
-                                        st.session_state["_pipeline_target_sid"] = _sid_clean
-                                        st.rerun()
-                                    else:
-                                        st.error(f"Could not start pipeline (HTTP {_pr.status_code}).")
-                                except Exception as _pe:
-                                    st.error(f"Could not reach pipeline server: {_pe}")
+                        if st.button(f"Process {_sid_clean} Now", key="process_now_btn"):
+                            try:
+                                _pr = requests.post(
+                                    f"{API_BASE}/pipeline/run",
+                                    json={"student_id": _sid_clean, "llm_provider": llm_provider},
+                                    timeout=20,
+                                )
+                                if _pr.ok:
+                                    st.session_state["_pipeline_job_id"] = _pr.json().get("job_id")
+                                    st.session_state["_pipeline_target_sid"] = _sid_clean
+                                    st.rerun()
+                                else:
+                                    st.error(f"Could not start pipeline (HTTP {_pr.status_code}).")
+                            except Exception as _pe:
+                                st.error(f"Could not reach pipeline server: {_pe}")
                     else:
                         st.markdown(
                             f'<div class="auth-error">{icon("alert","#ff3d57",14)}&nbsp;'

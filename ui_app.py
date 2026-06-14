@@ -1433,16 +1433,27 @@ def show_dashboard():
         with st.container(border=True):
             st.markdown('<div class="sg-title">Pipeline Controls</div>', unsafe_allow_html=True)
             if IS_CLOUD:
-                st.markdown(
-                    f'<div style="background:rgba(41,121,255,.07);border:1px solid rgba(41,121,255,.2);'
-                    f'border-radius:10px;padding:.85rem 1.1rem;font-size:.83rem;color:#888;line-height:1.6;">'
-                    f'{icon("info","#2979ff",14)}&nbsp;'
-                    f'Pipeline processing runs on the <strong style="color:#c0c8d8">Render backend</strong>. '
-                    f'To re-process students, trigger the job from your '
-                    f'<a href="https://dashboard.render.com" target="_blank" style="color:#2979ff;">'
-                    f'Render dashboard</a> or call the API manually.</div>',
-                    unsafe_allow_html=True,
-                )
+                _pc1, _pc2 = st.columns([2.5, 1])
+                with _pc1:
+                    st.markdown(
+                        '<p style="font-size:.83rem;color:#777;margin:0;line-height:1.6;">'
+                        'Re-process all students via the Render backend. '
+                        'Reports will refresh in Google Sheets within a few minutes.</p>',
+                        unsafe_allow_html=True,
+                    )
+                with _pc2:
+                    if st.button("Run Pipeline", key="run_pipeline_cloud_btn", use_container_width=True):
+                        try:
+                            _fpr = requests.post(
+                                "https://ai-student-intelligence.onrender.com/run-pipeline",
+                                timeout=30,
+                            )
+                            if _fpr.ok:
+                                st.success("Pipeline triggered. Reports will update shortly.")
+                            else:
+                                st.error(f"Pipeline returned HTTP {_fpr.status_code}.")
+                        except Exception as _fpe:
+                            st.error(f"Could not reach Render backend: {_fpe}")
             else:
                 _pc1, _pc2 = st.columns([2.5, 1])
                 with _pc1:

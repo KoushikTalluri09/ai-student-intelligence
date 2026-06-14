@@ -55,12 +55,13 @@ def get_credentials() -> Credentials:
     except Exception:
         pass
 
-    # Method 2: Render — base64 encoded env variable
+    # Method 2: base64-encoded JSON — env var (Render) or Streamlit secret string (old format)
     try:
-        if os.environ.get("GOOGLE_CREDENTIALS_BASE64"):
-            creds_json = json.loads(
-                base64.b64decode(os.environ["GOOGLE_CREDENTIALS_BASE64"])
-            )
+        b64 = os.environ.get("GOOGLE_CREDENTIALS_BASE64")
+        if not b64:
+            b64 = st.secrets.get("GOOGLE_CREDENTIALS_BASE64")
+        if b64:
+            creds_json = json.loads(base64.b64decode(b64))
             return Credentials.from_service_account_info(creds_json, scopes=SCOPES)
     except Exception:
         pass
@@ -204,6 +205,39 @@ def update_user_student_id(spreadsheet, email: str, student_id: str):
         return
     df.loc[mask, "student_id"] = student_id
     write_table(spreadsheet, "users", df)
+
+
+# =====================================================
+# PER-STUDENT QUERY HELPERS
+# Each opens its own GS client so callers don't need
+# to manage the spreadsheet handle.
+# =====================================================
+
+def _filter_by_student(table_name: str, student_id: str) -> pd.DataFrame:
+    client = get_gs_client()
+    sp = get_spreadsheet(client)
+    df = read_table(sp, table_name)
+    if df.empty or "student_id" not in df.columns:
+        return pd.DataFrame()
+    df["student_id"] = df["student_id"].astype(str).str.strip()
+    return df[df["student_id"] == student_id.strip()]
+
+
+def get_student_consolidated(student_id: str) -> dict:
+    rows = _filter_by_student("student_consolidated_latest", student_id)
+    return rows.iloc[0].to_dict() if not rows.empty else {}
+
+
+def get_subject_summaries(student_id: str) -> list:
+    return _filter_by_student("subject_summaries", student_id).to_dict("records")
+
+
+def get_subject_insights(student_id: str) -> list:
+    return _filter_by_student("subject_insights", student_id).to_dict("records")
+
+
+def get_subject_analytics(student_id: str) -> list:
+    return _filter_by_student("subject_analytics", student_id).to_dict("records")
 
 
 def upsert_table(spreadsheet, table_name: str, df: pd.DataFrame, key_columns: List[str]):

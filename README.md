@@ -96,6 +96,41 @@ AI Student Intelligence is a full-stack academic intelligence system that runs a
 
 Transparent, shareable, auditable, and accessible to non-technical stakeholders without a separate database server. All pipeline outputs are written to named worksheets in a single Google Spreadsheet.
 
+### AI Provider Guide
+
+The platform supports five LLM providers. Which ones you can use depends on where the app is running:
+
+| Provider | Live website | Local development |
+|---|---|---|
+| Claude (Anthropic) | ✅ (requires `ANTHROPIC_API_KEY`) | ✅ |
+| OpenAI GPT | ✅ (requires `OPENAI_API_KEY`) | ✅ |
+| Google Gemini | ✅ (requires `GEMINI_API_KEY`) | ✅ |
+| DeepSeek | ✅ (requires `DEEPSEEK_API_KEY`) | ✅ |
+| Ollama | ❌ local machine only | ✅ free, no key needed |
+
+**Why can't I use Ollama on the live website?**  
+Ollama is a local inference server that runs on your own machine. It is not accessible over the internet, so it cannot be used on the hosted Streamlit Cloud deployment. Select Claude, OpenAI, Gemini, or DeepSeek when using the live site.
+
+**To use Ollama, run the app locally:**
+```bash
+streamlit run ui_app.py
+```
+
+**Adding API keys to Streamlit Cloud secrets:**
+
+1. Open your app in [share.streamlit.io](https://share.streamlit.io)
+2. Go to **Settings → Secrets**
+3. Add one or more of these keys in TOML format:
+
+```toml
+ANTHROPIC_API_KEY = "sk-ant-..."
+OPENAI_API_KEY    = "sk-..."
+GEMINI_API_KEY    = "your-gemini-key"
+DEEPSEEK_API_KEY  = "your-deepseek-key"
+```
+
+Each key is only needed for the provider you want to use. You do not need to set all four.
+
 ### Cached vs Live AI
 
 - **Cached mode (default):** Reads pre-computed AI summaries. Fast, free, deterministic.

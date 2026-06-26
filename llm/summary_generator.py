@@ -96,6 +96,12 @@ Return ONLY valid JSON in the following structure:
 # ============================================================
 
 def call_ollama(prompt: str) -> str:
+    if os.environ.get("DEPLOYMENT") == "cloud":
+        raise ValueError(
+            "Ollama is not available on the live website. "
+            "It only runs on your local machine. "
+            "Please select Claude, OpenAI, Gemini, or DeepSeek."
+        )
     import ollama
     r = ollama.chat(
         model=os.getenv("OLLAMA_MODEL", "mistral"),
@@ -157,6 +163,12 @@ def call_deepseek(prompt: str, api_key: str = None) -> str:
 
 def call_llm(prompt: str, provider: str = None, api_key: str = None) -> str:
     provider = (provider or os.getenv("LLM_PROVIDER", "ollama")).lower()
+    if os.environ.get("DEPLOYMENT") == "cloud" and provider == "ollama":
+        raise ValueError(
+            "Ollama is not available on the live website. "
+            "It only runs on your local machine. "
+            "Please select Claude, OpenAI, Gemini, or DeepSeek."
+        )
     if provider == "ollama":
         return call_ollama(prompt)
     if provider == "openai":

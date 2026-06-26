@@ -1410,11 +1410,14 @@ def show_dashboard():
             "deepseek": "DEEPSEEK_API_KEY",
         }
 
+        # Default: Claude for cloud (index 0), Ollama for local (last index)
+        _default_idx = 0 if IS_CLOUD else len(_PROVIDER_OPTIONS) - 1
         _ai_col, _ = st.columns([1, 1])
         with _ai_col:
             _selected_display = st.selectbox(
                 "AI Provider",
                 options=_PROVIDER_OPTIONS,
+                index=_default_idx,
                 key="llm_provider_select",
             )
 
@@ -1425,9 +1428,26 @@ def show_dashboard():
 
         if IS_CLOUD:
             if llm_provider == "ollama":
-                st.warning(
-                    "Ollama only works when running locally. "
-                    "Select Claude, OpenAI, Gemini or DeepSeek for the live website."
+                st.markdown(
+                    '<div style="background:rgba(255,171,64,.10);border:1px solid rgba(255,171,64,.35);'
+                    'border-radius:10px;padding:.9rem 1.1rem;margin-top:.5rem;">'
+                    '<div style="display:flex;align-items:flex-start;gap:.6rem;">'
+                    '<span style="font-size:1rem;line-height:1.2;">⚠️</span>'
+                    '<div>'
+                    '<div style="font-size:.84rem;font-weight:700;color:#ffab40;margin-bottom:.3rem;">'
+                    'Ollama is not available on the live website'
+                    '</div>'
+                    '<div style="font-size:.81rem;color:#bbb;line-height:1.6;">'
+                    'Ollama runs on your local machine only. To use the live website, '
+                    'select a cloud AI provider above.<br>'
+                    'To use Ollama, run the app locally with:&nbsp;'
+                    '<code style="background:#1a1a1a;padding:.1rem .45rem;border-radius:4px;'
+                    'font-size:.77rem;color:#90caf9;">streamlit run ui_app.py</code>'
+                    '</div>'
+                    '</div>'
+                    '</div>'
+                    '</div>',
+                    unsafe_allow_html=True,
                 )
             else:
                 _secret_key = _PROVIDER_SECRET_KEY.get(llm_provider, "")
@@ -1450,13 +1470,6 @@ def show_dashboard():
             key="generate_btn",
             disabled=_ollama_in_cloud,
         )
-        if _ollama_in_cloud:
-            st.markdown(
-                '<div style="font-size:.8rem;color:#ff9800;margin-top:.4rem;text-align:center;">'
-                'Please select a cloud AI provider to generate reports on the live website.'
-                '</div>',
-                unsafe_allow_html=True,
-            )
         st.markdown('</div>', unsafe_allow_html=True)
 
         _auto = bool(st.session_state.get("_auto_generate", False))

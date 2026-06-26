@@ -106,9 +106,9 @@ def call_ollama(prompt: str) -> str:
     )
     return r["message"]["content"]
 
-def call_openai(prompt: str) -> str:
+def call_openai(prompt: str, api_key: str = None) -> str:
     from openai import OpenAI
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
     r = client.chat.completions.create(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         messages=[
@@ -119,9 +119,9 @@ def call_openai(prompt: str) -> str:
     )
     return r.choices[0].message.content
 
-def call_claude(prompt: str) -> str:
+def call_claude(prompt: str, api_key: str = None) -> str:
     from anthropic import Anthropic
-    client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    client = Anthropic(api_key=api_key or os.getenv("ANTHROPIC_API_KEY"))
     r = client.messages.create(
         model=os.getenv("CLAUDE_MODEL", "claude-3-haiku-20240307"),
         max_tokens=700,
@@ -130,19 +130,19 @@ def call_claude(prompt: str) -> str:
     )
     return r.content[0].text
 
-def call_gemini(prompt: str) -> str:
+def call_gemini(prompt: str, api_key: str = None) -> str:
     import google.generativeai as genai
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    genai.configure(api_key=api_key or os.getenv("GEMINI_API_KEY"))
     model = genai.GenerativeModel(
         model_name=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
         system_instruction=SYSTEM_PROMPT,
     )
     return model.generate_content(prompt).text
 
-def call_deepseek(prompt: str) -> str:
+def call_deepseek(prompt: str, api_key: str = None) -> str:
     from openai import OpenAI
     client = OpenAI(
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
+        api_key=api_key or os.getenv("DEEPSEEK_API_KEY"),
         base_url="https://api.deepseek.com",
     )
     r = client.chat.completions.create(
@@ -155,30 +155,30 @@ def call_deepseek(prompt: str) -> str:
     )
     return r.choices[0].message.content
 
-def call_llm(prompt: str) -> str:
-    provider = os.getenv("LLM_PROVIDER", "ollama").lower()
+def call_llm(prompt: str, provider: str = None, api_key: str = None) -> str:
+    provider = (provider or os.getenv("LLM_PROVIDER", "ollama")).lower()
     if provider == "ollama":
         return call_ollama(prompt)
     if provider == "openai":
-        return call_openai(prompt)
+        return call_openai(prompt, api_key=api_key)
     if provider == "claude":
-        return call_claude(prompt)
+        return call_claude(prompt, api_key=api_key)
     if provider == "gemini":
-        return call_gemini(prompt)
+        return call_gemini(prompt, api_key=api_key)
     if provider == "deepseek":
-        return call_deepseek(prompt)
+        return call_deepseek(prompt, api_key=api_key)
     raise ValueError(f"Unsupported LLM_PROVIDER: {provider}")
 
 # ============================================================
 # SUMMARY GENERATION
 # ============================================================
 
-def generate_summary(row: Dict) -> Dict:
+def generate_summary(row: Dict, provider: str = None, api_key: str = None) -> Dict:
     prompt = build_prompt(row)
 
     for _ in range(MAX_RETRIES):
         try:
-            raw = call_llm(prompt)
+            raw = call_llm(prompt, provider=provider, api_key=api_key)
             parsed = safe_json_parse(raw)
             if parsed:
                 return parsed

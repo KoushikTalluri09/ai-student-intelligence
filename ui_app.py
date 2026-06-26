@@ -1388,18 +1388,58 @@ def show_dashboard():
             with r1c2:
                 fast_mode = True if IS_CLOUD else st.toggle("Fast Mode  (local Ollama)", value=True, key="fast_mode")
 
+        _PROVIDER_OPTIONS = [
+            "Claude (Anthropic)",
+            "OpenAI GPT",
+            "Google Gemini",
+            "DeepSeek",
+            "Ollama (local only)",
+        ]
+        _PROVIDER_KEY_MAP = {
+            "Claude (Anthropic)": "claude",
+            "OpenAI GPT": "openai",
+            "Google Gemini": "gemini",
+            "DeepSeek": "deepseek",
+            "Ollama (local only)": "ollama",
+        }
+        _PROVIDER_SECRET_KEY = {
+            "claude": "ANTHROPIC_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "gemini": "GEMINI_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY",
+        }
+
+        _ai_col, _ = st.columns([1, 1])
+        with _ai_col:
+            _selected_display = st.selectbox(
+                "AI Provider",
+                options=_PROVIDER_OPTIONS,
+                key="llm_provider_select",
+            )
+
+        llm_provider = _PROVIDER_KEY_MAP[_selected_display]
+        st.session_state.selected_provider = llm_provider
+
+        _ollama_in_cloud = IS_CLOUD and llm_provider == "ollama"
+
         if IS_CLOUD:
-            llm_provider = os.environ.get("LLM_PROVIDER", "ollama")
-        elif not fast_mode:
-            ai_col, _ = st.columns([1, 1])
-            with ai_col:
-                llm_provider = st.selectbox(
-                    "AI Model",
-                    options=["openai", "claude", "gemini", "deepseek"],
-                    key="llm_provider_select",
+            if llm_provider == "ollama":
+                st.warning(
+                    "Ollama only works when running locally. "
+                    "Select Claude, OpenAI, Gemini or DeepSeek for the live website."
                 )
-        else:
-            llm_provider = "ollama"
+            else:
+                _secret_key = _PROVIDER_SECRET_KEY.get(llm_provider, "")
+                _has_key = False
+                try:
+                    _has_key = bool(st.secrets.get(_secret_key))
+                except Exception:
+                    pass
+                if not _has_key and _secret_key:
+                    st.info(
+                        f"API key for {_selected_display} is not configured. "
+                        f"Ask the admin to add {_secret_key} to Streamlit secrets."
+                    )
 
         st.markdown("<div style='height:.3rem'></div>", unsafe_allow_html=True)
         st.markdown('<div class="cta-wrap">', unsafe_allow_html=True)
@@ -1407,7 +1447,15 @@ def show_dashboard():
             "Load My Report" if is_student else "Generate Academic Report",
             use_container_width=True,
             key="generate_btn",
+            disabled=_ollama_in_cloud,
         )
+        if _ollama_in_cloud:
+            st.markdown(
+                '<div style="font-size:.8rem;color:#ff9800;margin-top:.4rem;text-align:center;">'
+                'Please select a cloud AI provider to generate reports on the live website.'
+                '</div>',
+                unsafe_allow_html=True,
+            )
         st.markdown('</div>', unsafe_allow_html=True)
 
         _auto = bool(st.session_state.get("_auto_generate", False))
@@ -1418,13 +1466,13 @@ def show_dashboard():
                 pass
         generate = generate or _auto
 
-        if IS_CLOUD:
+        if IS_CLOUD and not _ollama_in_cloud:
             st.markdown(
                 '<div style="font-size:.7rem;color:#444;margin-top:.4rem;text-align:center;">'
                 'Reading cached reports directly from Google Sheets</div>',
                 unsafe_allow_html=True,
             )
-        elif fast_mode:
+        elif not IS_CLOUD and fast_mode:
             st.markdown(
                 '<div style="font-size:.7rem;color:#444;margin-top:.4rem;text-align:center;">'
                 'Fast Mode: using local Ollama — instant, no API key required'

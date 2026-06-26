@@ -92,6 +92,21 @@ Return ONLY valid JSON in the following structure:
 """
 
 # ============================================================
+# API KEY RESOLVER
+# ============================================================
+
+def _get_api_key(env_var: str) -> Optional[str]:
+    """Read an LLM API key: st.secrets first (Streamlit Cloud), then os.environ (Render / local)."""
+    try:
+        import streamlit as st
+        val = st.secrets.get(env_var)
+        if val:
+            return str(val)
+    except Exception:
+        pass
+    return os.getenv(env_var)
+
+# ============================================================
 # LLM BACKENDS
 # ============================================================
 
@@ -114,7 +129,7 @@ def call_ollama(prompt: str) -> str:
 
 def call_openai(prompt: str, api_key: str = None) -> str:
     from openai import OpenAI
-    client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+    client = OpenAI(api_key=api_key or _get_api_key("OPENAI_API_KEY"))
     r = client.chat.completions.create(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         messages=[
@@ -127,7 +142,7 @@ def call_openai(prompt: str, api_key: str = None) -> str:
 
 def call_claude(prompt: str, api_key: str = None) -> str:
     from anthropic import Anthropic
-    client = Anthropic(api_key=api_key or os.getenv("ANTHROPIC_API_KEY"))
+    client = Anthropic(api_key=api_key or _get_api_key("ANTHROPIC_API_KEY"))
     r = client.messages.create(
         model=os.getenv("CLAUDE_MODEL", "claude-3-haiku-20240307"),
         max_tokens=700,
@@ -138,7 +153,7 @@ def call_claude(prompt: str, api_key: str = None) -> str:
 
 def call_gemini(prompt: str, api_key: str = None) -> str:
     import google.generativeai as genai
-    genai.configure(api_key=api_key or os.getenv("GEMINI_API_KEY"))
+    genai.configure(api_key=api_key or _get_api_key("GEMINI_API_KEY"))
     model = genai.GenerativeModel(
         model_name=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
         system_instruction=SYSTEM_PROMPT,
@@ -148,7 +163,7 @@ def call_gemini(prompt: str, api_key: str = None) -> str:
 def call_deepseek(prompt: str, api_key: str = None) -> str:
     from openai import OpenAI
     client = OpenAI(
-        api_key=api_key or os.getenv("DEEPSEEK_API_KEY"),
+        api_key=api_key or _get_api_key("DEEPSEEK_API_KEY"),
         base_url="https://api.deepseek.com",
     )
     r = client.chat.completions.create(

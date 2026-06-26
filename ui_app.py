@@ -1123,14 +1123,14 @@ def _load_cached_direct(student_id: str) -> dict:
     """
     client = get_gs_client()
     sheet  = get_spreadsheet(client)
-    sid    = student_id.strip()
+    sid    = student_id.strip().upper()
 
     def _safe_read(name: str) -> pd.DataFrame:
         try:
             df = read_table(sheet, name)
             if not df.empty and "student_id" in df.columns:
                 df = df.copy()
-                df["student_id"] = df["student_id"].astype(str).str.strip()
+                df["student_id"] = df["student_id"].astype(str).str.strip().str.upper()
             return df
         except Exception:
             return pd.DataFrame()
@@ -1244,6 +1244,14 @@ def _section_label(text: str, color: str = "#2979ff") -> str:
         f'<div style="font-size:.67rem;font-weight:700;letter-spacing:.13em;'
         f'text-transform:uppercase;color:{color};margin-bottom:.9rem;">{text}</div>'
     )
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _cached_sheet(_table: str) -> list:
+    """Read a Google Sheets tab and return records as a list-of-dicts, cached for 5 min."""
+    _cli = get_gs_client()
+    _sp = get_spreadsheet(_cli)
+    _df = read_table(_sp, _table)
+    return [] if _df.empty else _df.to_dict("records")
 
 # ============================================================
 # DASHBOARD PAGE
@@ -1583,20 +1591,12 @@ def show_dashboard():
 
                     # This student specifically has no processed data
                     if not _raw["consolidated"] or not _raw["analytics"] or not _raw["summaries"]:
-                        st.markdown(f"""
-                        <div style="background:rgba(255,171,64,.09);border:1px solid rgba(255,171,64,.28);
-                                    border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1rem;">
-                          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">
-                            {icon("info","#ffab40",15,2)}
-                            <span style="font-size:.85rem;font-weight:700;color:#ffab40;">Student Not Yet Processed</span>
-                          </div>
-                          <p style="font-size:.83rem;color:#aaa;margin:0 0 .9rem;line-height:1.6;">
-                            <strong style="color:#e0e0e0">{_sid_clean}</strong> does not have processed
-                            reports yet. Run the pipeline from your Render dashboard to generate this
-                            student&rsquo;s report.
-                          </p>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        st.markdown(
+                            f'<div class="auth-error">{icon("alert","#ff3d57",14)}&nbsp;'
+                            f'No report found for <strong>{_sid_clean}</strong>. '
+                            f'Check the student ID or ask your admin to run the pipeline for this student.</div>',
+                            unsafe_allow_html=True,
+                        )
                         st.stop()
 
                     _cons = _raw["consolidated"][0]
@@ -1637,17 +1637,10 @@ def show_dashboard():
                         "mode":                   "cached",
                         "llm_provider_used":      _normalize_val(_cons.get("llm_provider", "ollama")),
                     }
-                except Exception as _e:
-                    # Show the REAL Python exception type so we can distinguish
-                    # gspread.exceptions.APIError (auth/sheet access) from
-                    # gspread.exceptions.WorksheetNotFound (missing tab) from
-                    # anything else — the str() of APIError looks like a
-                    # requests Response but it is NOT a direct HTTP call here.
-                    import traceback as _tb
+                except Exception:
                     st.error(
-                        f"Sheets read failed: {type(_e).__name__}: {_e}"
+                        "Unable to connect to the database. Please try again in a few seconds."
                     )
-                    st.code(_tb.format_exc(), language="text")
                     st.stop()
 
         elif fast_mode:
@@ -1691,8 +1684,8 @@ def show_dashboard():
                     else:
                         st.markdown(
                             f'<div class="auth-error">{icon("alert","#ff3d57",14)}&nbsp;'
-                            f'Student <strong>{_sid_clean}</strong> not found in the system. '
-                            f'Check the student ID and try again.</div>',
+                            f'No report found for <strong>{_sid_clean}</strong>. '
+                            f'Check the student ID or ask your admin to run the pipeline for this student.</div>',
                             unsafe_allow_html=True,
                         )
                     st.stop()
@@ -1758,8 +1751,8 @@ def show_dashboard():
                 else:
                     st.markdown(
                         f'<div class="auth-error">{icon("alert","#ff3d57",14)}&nbsp;'
-                        f'Student <strong>{_sid_clean}</strong> not found in the system. '
-                        f'Check the student ID and try again.</div>',
+                        f'No report found for <strong>{_sid_clean}</strong>. '
+                        f'Check the student ID or ask your admin to run the pipeline for this student.</div>',
                         unsafe_allow_html=True,
                     )
                 st.stop()
@@ -1857,14 +1850,18 @@ def show_dashboard():
 
         # ── 2. Academic overview ──────────────────────────────────
         overview = data.get("overall_summary", "")
-        if overview:
-            st.markdown(
-                f'<div class="sg-card">'
-                f'<div style="font-size:.67rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;'
-                f'color:#2979ff;margin-bottom:.75rem;">Academic Overview</div>'
-                f'<p style="font-size:.92rem;color:#c0c8d8;line-height:1.78;margin:0">{overview}</p></div>',
-                unsafe_allow_html=True,
+        st.markdown(
+            f'<div class="sg-card">'
+            f'<div style="font-size:.67rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;'
+            f'color:#2979ff;margin-bottom:.75rem;">Academic Overview</div>'
+            + (
+                f'<p style="font-size:.92rem;color:#c0c8d8;line-height:1.78;margin:0">{overview}</p>'
+                if overview else
+                f'<p style="font-size:.84rem;color:#555;margin:0;font-style:italic;">No data available.</p>'
             )
+            + '</div>',
+            unsafe_allow_html=True,
+        )
 
         # ── 3. Radar chart ────────────────────────────────────────
         if metrics and len(metrics) >= 2:
@@ -2182,16 +2179,14 @@ def show_students():
     # ── Data loading ──────────────────────────────────────────
     try:
         with st.spinner("Loading student roster…"):
-            client   = get_gs_client()
-            sp       = get_spreadsheet(client)
-            analytics_df    = read_table(sp, "subject_analytics")
-            validated_df    = read_table(sp, "validated_results")
-            consolidated_df = read_table(sp, "student_consolidated_latest")
+            analytics_df    = pd.DataFrame(_cached_sheet("subject_analytics"))
+            validated_df    = pd.DataFrame(_cached_sheet("validated_results"))
+            consolidated_df = pd.DataFrame(_cached_sheet("student_consolidated_latest"))
     except Exception:
         _show_empty_state(
             icon("zap", "#2a2a2a", 48, 1.2),
             "Connection Unavailable",
-            "Could not connect to Google Sheets. Check your credentials.",
+            "Unable to connect to the database. Please try again in a few seconds.",
         )
         return
 
@@ -2507,40 +2502,49 @@ def show_reports():
     """, unsafe_allow_html=True)
 
     try:
-        client = get_gs_client()
-        sp = get_spreadsheet(client)
-
-        # Load consolidated reports sheet
-        try:
-            reports_df = read_table(sp, "student_consolidated_latest")
-        except Exception:
-            reports_df = pd.DataFrame()
-
-        if not reports_df.empty:
-            st.markdown(_section_label("Recent Reports"), unsafe_allow_html=True)
-
-            # Show a summary count row
-            cols = st.columns(3)
-            total = len(reports_df)
-            with cols[0]:
-                st.markdown(f"""
-                <div class="sg-metric green">
-                    <div class="sg-metric-label">Total Reports</div>
-                    <div class="sg-metric-value green">{total}</div>
-                </div>""", unsafe_allow_html=True)
-
-            st.dataframe(reports_df.head(50), use_container_width=True, hide_index=True)
-        else:
-            _show_empty_state(
-                icon("file", "#2a2a2a", 48, 1.2),
-                "No Reports Yet",
-                "Generate a report from the Dashboard to see it here.",
-            )
+        reports_df = pd.DataFrame(_cached_sheet("student_consolidated_latest"))
     except Exception:
         _show_empty_state(
             icon("zap", "#2a2a2a", 48, 1.2),
             "Connection Unavailable",
-            "Could not connect to Google Sheets. Check your credentials.",
+            "Unable to connect to the database. Please try again in a few seconds.",
+        )
+        return
+
+    if not reports_df.empty:
+        st.markdown(_section_label("Recent Reports"), unsafe_allow_html=True)
+
+        total = len(reports_df)
+        _rc1, _rc2, _rc3 = st.columns(3)
+        with _rc1:
+            st.markdown(f"""
+            <div class="sg-metric green">
+                <div class="sg-metric-label">Total Reports</div>
+                <div class="sg-metric-value green">{total}</div>
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown("<div style='height:.8rem'></div>", unsafe_allow_html=True)
+
+        # Show focused, human-readable columns only
+        _col_map = {
+            "student_id":    "Student ID",
+            "student_name":  "Name",
+            "grade":         "Grade",
+            "overall_summary": "AI Summary (preview)",
+            "llm_provider":  "Provider",
+        }
+        _show_cols = [c for c in _col_map if c in reports_df.columns]
+        _disp_df = reports_df[_show_cols].head(50).rename(columns=_col_map).copy()
+        if "AI Summary (preview)" in _disp_df.columns:
+            _disp_df["AI Summary (preview)"] = (
+                _disp_df["AI Summary (preview)"].astype(str).str[:120] + "…"
+            )
+        st.dataframe(_disp_df, use_container_width=True, hide_index=True)
+    else:
+        _show_empty_state(
+            icon("file", "#2a2a2a", 48, 1.2),
+            "No Reports Yet",
+            "Generate a report from the Dashboard to see it here.",
         )
 
 # ============================================================

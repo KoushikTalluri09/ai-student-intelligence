@@ -25,6 +25,7 @@ from storage.google_sheets import (
     update_user_student_id,
     get_student_report_direct,
     list_worksheet_titles,
+    write_student_raw_data,
 )
 
 # ============================================================
@@ -2679,6 +2680,238 @@ def show_settings():
                     f'&nbsp;Could not load users: {_ae}</div>',
                     unsafe_allow_html=True,
                 )
+
+        # ── Add New Student ─────────────────────────────────────────────────
+        with st.container(border=True):
+            st.markdown('<div class="sg-title">Add New Student</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<p style="font-size:.84rem;color:#777;margin-bottom:1rem;">'
+                'Enter the student\'s details and exam scores. '
+                '<strong style="color:#c0c8d8">Save Student</strong> writes the record '
+                'to Google Sheets and triggers the AI pipeline for that student only.</p>',
+                unsafe_allow_html=True,
+            )
+
+            # Basic info
+            _ns_c1, _ns_c2, _ns_c3 = st.columns([1, 1.5, 1])
+            with _ns_c1:
+                _ns_sid = st.text_input(
+                    "Student ID", placeholder="e.g. S051", key="ns_student_id"
+                )
+            with _ns_c2:
+                _ns_name = st.text_input(
+                    "Student Name", placeholder="e.g. Jane Smith", key="ns_student_name"
+                )
+            with _ns_c3:
+                _ns_grade = st.text_input(
+                    "Grade", placeholder="e.g. 11", key="ns_grade"
+                )
+
+            # Dynamic subject rows
+            if "ns_subject_count" not in st.session_state:
+                st.session_state.ns_subject_count = 1
+
+            st.markdown(
+                '<div style="font-size:.79rem;font-weight:600;color:#888;'
+                'margin:.9rem 0 .4rem;text-transform:uppercase;letter-spacing:.06em;">'
+                'Subjects &amp; Scores</div>',
+                unsafe_allow_html=True,
+            )
+
+            _ns_subjects = []
+            for _i in range(st.session_state.ns_subject_count):
+                _sc1, _sc2, _sc3 = st.columns([1.5, 2.5, 0.8])
+                with _sc1:
+                    _sn = st.text_input(
+                        f"Subject {_i + 1}",
+                        placeholder="e.g. Math",
+                        key=f"ns_subj_name_{_i}",
+                    )
+                with _sc2:
+                    _ss = st.text_input(
+                        "Scores (comma-separated)" if _i == 0 else " ",
+                        placeholder="e.g. 85, 90, 78",
+                        key=f"ns_subj_scores_{_i}",
+                        label_visibility="visible" if _i == 0 else "hidden",
+                    )
+                with _sc3:
+                    _sm = st.number_input(
+                        "Max score" if _i == 0 else " ",
+                        value=100,
+                        min_value=1,
+                        key=f"ns_subj_max_{_i}",
+                        label_visibility="visible" if _i == 0 else "hidden",
+                    )
+                _ns_subjects.append({"name": _sn, "scores_str": _ss, "max_score": _sm})
+
+            if st.button("+ Add Subject", key="ns_add_subject"):
+                st.session_state.ns_subject_count += 1
+                st.rerun()
+
+            st.markdown("<div style='height:.5rem'></div>", unsafe_allow_html=True)
+
+            _ns_save = st.button(
+                "Save Student", key="ns_save_student", use_container_width=True
+            )
+
+            if _ns_save:
+                # ── Validation ──────────────────────────────────────────────
+                _ns_errors = []
+                _ns_sid_clean = _ns_sid.strip()
+                _ns_name_clean = _ns_name.strip()
+                _ns_grade_clean = _ns_grade.strip()
+
+                if not _ns_sid_clean:
+                    _ns_errors.append("Student ID is required.")
+                if not _ns_name_clean:
+                    _ns_errors.append("Student Name is required.")
+                _ns_grade_int = None
+                try:
+                    _ns_grade_int = int(_ns_grade_clean)
+                    if not (1 <= _ns_grade_int <= 12):
+                        _ns_errors.append("Grade must be between 1 and 12.")
+                except (ValueError, TypeError):
+                    _ns_errors.append("Grade must be a number between 1 and 12.")
+
+                _ns_parsed_subjects = []
+                for _i, _s in enumerate(_ns_subjects):
+                    if not _s["name"].strip():
+                        _ns_errors.append(f"Subject {_i + 1} name is required.")
+                        continue
+                    try:
+                        _scores = [
+                            float(x.strip())
+                            for x in _s["scores_str"].split(",")
+                            if x.strip()
+                        ]
+                        if not _scores:
+                            _ns_errors.append(
+                                f"Subject {_i + 1} ({_s['name']}) has no scores."
+                            )
+                        else:
+                            _ns_parsed_subjects.append({
+                                "name":      _s["name"].strip(),
+                                "scores":    _scores,
+                                "max_score": float(_s["max_score"]),
+                            })
+                    except ValueError:
+                        _ns_errors.append(
+                            f"Subject {_i + 1} scores must be numbers "
+                            f"(e.g. 85, 90, 78). Got: {_s['scores_str']!r}"
+                        )
+
+                if not _ns_parsed_subjects and not _ns_errors:
+                    _ns_errors.append("At least one subject with scores is required.")
+
+                if _ns_errors:
+                    for _err in _ns_errors:
+                        st.markdown(
+                            f'<div class="auth-error">{icon("alert","#ff3d57",14)}'
+                            f'&nbsp;{_err}</div>',
+                            unsafe_allow_html=True,
+                        )
+                else:
+                    _ns_student_data = {
+                        "student_id": _ns_sid_clean,
+                        "name":       _ns_name_clean,
+                        "grade":      _ns_grade_int,
+                        "subjects":   _ns_parsed_subjects,
+                    }
+
+                    # ── Step 1: write to Google Sheets ──────────────────────
+                    try:
+                        _gs_c = get_gs_client()
+                        _gs_s = get_spreadsheet(_gs_c)
+                        _nrows = write_student_raw_data(_gs_s, _ns_student_data)
+                        st.markdown(
+                            f'<div class="auth-success">{icon("check","#00e676",14)}'
+                            f'&nbsp;Student {_ns_sid_clean} saved to database '
+                            f'({_nrows} exam records).</div>',
+                            unsafe_allow_html=True,
+                        )
+                    except Exception as _nse:
+                        st.markdown(
+                            f'<div class="auth-error">{icon("alert","#ff3d57",14)}'
+                            f'&nbsp;Could not save student: {_nse}</div>',
+                            unsafe_allow_html=True,
+                        )
+                        st.stop()
+
+                    # ── Step 2: trigger pipeline ─────────────────────────────
+                    _ns_llm = st.session_state.get("selected_provider", "ollama")
+
+                    if IS_CLOUD:
+                        try:
+                            with st.spinner(
+                                f"Processing {_ns_sid_clean} through the AI pipeline..."
+                            ):
+                                _npr = requests.post(
+                                    "https://ai-student-intelligence.onrender.com/run-pipeline",
+                                    json={"student_id": _ns_sid_clean, "llm_provider": _ns_llm},
+                                    timeout=30,
+                                )
+                            if _npr.ok:
+                                st.success(
+                                    f"Report ready. Go to Dashboard and search "
+                                    f"{_ns_sid_clean} to view."
+                                )
+                            else:
+                                st.warning(
+                                    f"Pipeline returned HTTP {_npr.status_code}. "
+                                    "The report will appear in Google Sheets shortly."
+                                )
+                        except Exception as _npe:
+                            st.warning(f"Could not reach pipeline server: {_npe}")
+                    else:
+                        try:
+                            _npr = requests.post(
+                                f"{API_BASE}/pipeline/run",
+                                json={
+                                    "student_id": _ns_sid_clean,
+                                    "llm_provider": _ns_llm,
+                                },
+                                timeout=20,
+                            )
+                            if _npr.ok:
+                                _job_id = _npr.json().get("job_id", "")
+                                with st.spinner(
+                                    f"Processing {_ns_sid_clean} through the AI pipeline..."
+                                ):
+                                    _done = False
+                                    for _ in range(60):  # poll up to 5 minutes
+                                        time.sleep(5)
+                                        try:
+                                            _sr = requests.get(
+                                                f"{API_BASE}/pipeline/status/{_job_id}",
+                                                timeout=10,
+                                            )
+                                            _st_val = _sr.json().get("status", "running")
+                                            if _st_val == "done":
+                                                _done = True
+                                                break
+                                            if _st_val == "failed":
+                                                _err_msg = _sr.json().get("error", "")
+                                                st.error(f"Pipeline failed: {_err_msg}")
+                                                break
+                                        except Exception:
+                                            pass
+                                if _done:
+                                    st.success(
+                                        f"Report ready. Go to Dashboard and search "
+                                        f"{_ns_sid_clean} to view."
+                                    )
+                            else:
+                                st.warning(
+                                    f"Could not start pipeline "
+                                    f"(HTTP {_npr.status_code})."
+                                )
+                        except requests.exceptions.ConnectionError:
+                            st.warning(
+                                "Cannot reach the local backend. "
+                                "Is pipeline_server.py running?"
+                            )
+                        except Exception as _npe:
+                            st.warning(f"Pipeline error: {_npe}")
 
 # ============================================================
 # HELPERS

@@ -1,13 +1,13 @@
 ﻿# -*- coding: utf-8 -*-
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
 import os
 import json
 import threading
 import uuid as _uuid
 import pandas as pd
-from typing import Any
+from typing import Any, Optional
 
 from storage.google_sheets import (
     get_gs_client,
@@ -256,22 +256,42 @@ def check_student_exists(student_id: str):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@app.post("/pipeline/run")
-def start_pipeline(req: PipelineRunRequest):
-    """Start a full pipeline run in the background. Returns a job_id for status polling."""
+def _start_pipeline_job(student_id: str = "", llm_provider: str = "ollama") -> str:
+    """Shared helper: register a job, launch background thread, return job_id."""
     job_id = str(_uuid.uuid4())
     _pipeline_jobs[job_id] = {"status": "running", "error": ""}
+    sid = student_id.strip()
+    provider = llm_provider or "ollama"
 
     def _worker():
         try:
-            from pipeline_runner import run_full_pipeline
-            run_full_pipeline(req.llm_provider or "ollama", 999)
+            from pipeline_runner import run_full_pipeline, run_pipeline_for_student
+            if sid:
+                run_pipeline_for_student(sid, provider)
+            else:
+                run_full_pipeline(provider, 999)
             _pipeline_jobs[job_id]["status"] = "done"
         except Exception as exc:
             _pipeline_jobs[job_id]["status"] = "failed"
             _pipeline_jobs[job_id]["error"] = str(exc)
 
     threading.Thread(target=_worker, daemon=True).start()
+    return job_id
+
+
+@app.post("/pipeline/run")
+def start_pipeline(req: PipelineRunRequest):
+    """Start a pipeline run in the background. Filters to one student when student_id is set."""
+    job_id = _start_pipeline_job(req.student_id, req.llm_provider)
+    return {"job_id": job_id, "status": "running"}
+
+
+@app.post("/run-pipeline")
+def run_pipeline_endpoint(req: Optional[PipelineRunRequest] = Body(default=None)):
+    """Cloud-compatible pipeline trigger. Accepts optional student_id filter."""
+    if req is None:
+        req = PipelineRunRequest()
+    job_id = _start_pipeline_job(req.student_id, req.llm_provider)
     return {"job_id": job_id, "status": "running"}
 
 

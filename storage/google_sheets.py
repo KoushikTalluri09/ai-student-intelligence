@@ -289,6 +289,57 @@ def get_student_report_direct(student_id: str) -> dict:
     return result
 
 
+def write_student_raw_data(spreadsheet, student_data: dict) -> int:
+    """
+    Append a new student's exam records to raw_student_scores.
+
+    student_data format:
+        {
+            "student_id": "S051",
+            "name": "John Doe",
+            "grade": 11,
+            "subjects": [
+                {"name": "Math", "scores": [85, 90, 78], "max_score": 100},
+                ...
+            ]
+        }
+
+    Each score in the list becomes one row with exam_type="mock" and
+    attempt_number equal to its 1-based position. Returns the number of
+    rows appended.
+    """
+    from datetime import date
+
+    today = date.today().isoformat()
+    rows = []
+
+    for subj in student_data.get("subjects", []):
+        subj_name = str(subj["name"]).strip()
+        max_score = float(subj.get("max_score", 100))
+        prefix = subj_name[:3].upper().replace(" ", "_")
+
+        for i, score in enumerate(subj.get("scores", []), start=1):
+            rows.append({
+                "student_id": str(student_data["student_id"]).strip(),
+                "Name":        str(student_data["name"]).strip(),
+                "grade":       int(student_data["grade"]),
+                "subject":     subj_name,
+                "exam_id":     f"{prefix}_MOCK_{i}",
+                "exam_type":   "mock",
+                "attempt_number": i,
+                "score":       float(score),
+                "max_score":   max_score,
+                "exam_date":   today,
+            })
+
+    if not rows:
+        raise ValueError("No exam records to write — check that subjects have scores")
+
+    df = pd.DataFrame(rows)
+    append_table(spreadsheet, "raw_student_scores", df)
+    return len(rows)
+
+
 def upsert_table(spreadsheet, table_name: str, df: pd.DataFrame, key_columns: List[str]):
     df = _sanitize_df(df)
 
